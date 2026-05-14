@@ -58,8 +58,10 @@ describe("ConversationModal", () => {
     render(
       <ConversationModal
         sessionId="abc"
+        hostname="mac-A"
         sessionName="my-sess"
         project="/Users/u/Projects/foo"
+        lastEventAt="2026-05-14T12:00:02Z"
         backendHttpBase="http://localhost:8080"
         onClose={() => {}}
       />,
@@ -73,5 +75,10 @@ describe("ConversationModal", () => {
     // Tool calls and tool results are both hidden in v1.
     expect(screen.queryByText(/▶\s*Bash/)).toBeNull();
     expect(screen.queryByText(/should be hidden/)).toBeNull();
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/sessions/mac-A/abc/events"),
+      expect.anything(),
+    );
   });
 });

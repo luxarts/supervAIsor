@@ -13,6 +13,7 @@ const (
 
 // Session is the derived view of a Claude Code session.
 type Session struct {
+	Hostname      string     `json:"hostname"`
 	ID            string     `json:"id"`
 	Name          string     `json:"name"`
 	Project       string     `json:"project"`

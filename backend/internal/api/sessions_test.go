@@ -23,7 +23,7 @@ func TestGetSessions(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Second)
 	_ = db.UpsertSession(context.Background(), &state.Session{
-		ID: "s1", Name: "n", Project: "/tmp",
+		ID: "s1", Hostname: "host-test", Name: "n", Project: "/tmp",
 		Status: state.StatusIdle, StartedAt: now, LastEventAt: now,
 	})
 
@@ -107,6 +107,7 @@ func TestGetSessionEvents(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	sess := &state.Session{
 		ID:            "abc",
+		Hostname:      "host-test",
 		Name:          "s",
 		Project:       "/tmp/p",
 		Status:        "idle",
@@ -117,14 +118,14 @@ func TestGetSessionEvents(t *testing.T) {
 	if err := st.UpsertSession(ctx, sess); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.AppendEvent(ctx, "abc", now, "user", []byte(`{"text":"hi"}`)); err != nil {
+	if err := st.AppendEvent(ctx, "host-test", "abc", now, "user", []byte(`{"text":"hi"}`)); err != nil {
 		t.Fatal(err)
 	}
 
 	r := gin.New()
 	(&Handler{Store: st}).Register(r)
 
-	req := httptest.NewRequest("GET", "/sessions/abc/events", nil)
+	req := httptest.NewRequest("GET", "/sessions/host-test/abc/events", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -135,7 +136,7 @@ func TestGetSessionEvents(t *testing.T) {
 		t.Fatalf("body missing event payload: %s", w.Body.String())
 	}
 
-	req2 := httptest.NewRequest("GET", "/sessions/does-not-exist/events", nil)
+	req2 := httptest.NewRequest("GET", "/sessions/host-test/does-not-exist/events", nil)
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
 	if w2.Code != http.StatusNotFound {

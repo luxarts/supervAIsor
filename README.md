@@ -15,8 +15,11 @@ Read-only — supervAIsor does not spawn, kill, or interact with sessions.
 
 ## Architecture
 
-    host poller  ──ws──►  backend (Docker)  ◄──ws──  frontend (Docker)
-                        └─ SQLite (volume)
+    poller (mac A) ──ws──┐
+    poller (mac B) ──ws──┼──► backend (Docker)  ◄──ws──  frontend (Docker)
+    poller (mac C) ──ws──┘   └─ SQLite (volume)
+
+Backend and frontend run on a single machine. One or more pollers can run on different machines and feed the same backend concurrently. Each poller stamps every event with its `hostname`; sessions are keyed by `(hostname, session_id)` so the same Claude UUID can coexist across machines. Cards show the session as `name@hostname`.
 
 - **`poller/`** — host-native Go binary; tails `~/.claude/projects/*/*.jsonl` and ships events over WebSocket.
 - **`backend/`** — Go (Gin + gorilla/websocket). Derives session state, persists to SQLite, broadcasts updates.
@@ -56,13 +59,33 @@ To use it from your phone, point your browser at `http://<your-mac-lan-ip>:5173`
 
 ## Configuration
 
-Backend env vars: `PORT` (default `8080`), `DB_PATH` (default `/var/lib/supervaisor/data.db`, persisted via Docker volume).
-Frontend env: `VITE_BACKEND_WS` (default `ws://localhost:8080/ws/clients`).
-Poller flags: `-projects-dir`, `-state-file`, `-backend`, `-interval`.
+**Backend env vars:** `PORT` (default `8080`), `DB_PATH` (default `/var/lib/supervaisor/data.db`, persisted via Docker volume).
 
-No auth — this is a single-user, local-only instance.
+**Frontend env:** `VITE_BACKEND_WS` (default `ws://localhost:8080/ws/clients`).
 
-## Design + plan
+**Poller** — both flags and env vars are supported. Flags override env, env overrides defaults.
 
-- Spec: [`docs/superpowers/specs/2026-05-14-cyberpunk-session-monitor-design.md`](docs/superpowers/specs/2026-05-14-cyberpunk-session-monitor-design.md)
-- Plan: [`docs/superpowers/plans/2026-05-14-cyberpunk-session-monitor.md`](docs/superpowers/plans/2026-05-14-cyberpunk-session-monitor.md)
+| Flag             | Env var                       | Default                              | Description                                  |
+|------------------|-------------------------------|--------------------------------------|----------------------------------------------|
+| `-backend-host`  | `SUPERVAISOR_BACKEND_HOST`    | `localhost`                          | Backend host                                 |
+| `-backend-port`  | `SUPERVAISOR_BACKEND_PORT`    | `8080`                               | Backend port                                 |
+| `-backend`       | `SUPERVAISOR_BACKEND_URL`     | (derived from host+port)             | Full WS URL override                         |
+| `-hostname`      | `SUPERVAISOR_HOSTNAME`        | OS hostname (with `.local` stripped) | Machine tag shown after `@` in each card     |
+| `-projects-dir`  | `SUPERVAISOR_PROJECTS_DIR`    | `~/.claude/projects`                 | Claude projects dir                          |
+| `-state-file`    | `SUPERVAISOR_STATE_FILE`      | `~/.supervAIsor/poller-state.json`   | File offsets state                           |
+| `-interval`      | `SUPERVAISOR_INTERVAL`        | `1s`                                 | Poll interval                                |
+
+Example — point a remote poller at a backend on another machine:
+
+```bash
+SUPERVAISOR_BACKEND_HOST=10.0.0.5 SUPERVAISOR_HOSTNAME=mac-A make poller
+```
+
+No auth — this is a single-user, local-network-only instance.
+
+## Design + plans
+
+- Initial spec: [`docs/superpowers/specs/2026-05-14-cyberpunk-session-monitor-design.md`](docs/superpowers/specs/2026-05-14-cyberpunk-session-monitor-design.md)
+- Initial plan: [`docs/superpowers/plans/2026-05-14-cyberpunk-session-monitor.md`](docs/superpowers/plans/2026-05-14-cyberpunk-session-monitor.md)
+- Multi-machine pollers spec: [`docs/superpowers/specs/2026-05-14-multi-machine-pollers-design.md`](docs/superpowers/specs/2026-05-14-multi-machine-pollers-design.md)
+- Multi-machine pollers plan: [`docs/superpowers/plans/2026-05-14-multi-machine-pollers.md`](docs/superpowers/plans/2026-05-14-multi-machine-pollers.md)

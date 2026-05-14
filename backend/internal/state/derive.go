@@ -31,6 +31,9 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 	if next.ID == "" {
 		next.ID = env.SessionID
 	}
+	if next.Hostname == "" {
+		next.Hostname = env.Hostname
+	}
 	if p := DecodeProjectDir(env.ProjectDir); p != "" {
 		next.Project = p
 	}

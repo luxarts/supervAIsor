@@ -6,7 +6,7 @@ import { shortProject } from "../lib/path";
 
 interface Props {
   session: Session;
-  onOpen: (id: string) => void;
+  onOpen: () => void;
 }
 
 export function SessionCard({ session, onOpen }: Props) {
@@ -24,7 +24,7 @@ export function SessionCard({ session, onOpen }: Props) {
   return (
     <button
       type="button"
-      onClick={() => onOpen(session.id)}
+      onClick={onOpen}
       className={`relative min-h-[160px] w-full border bg-bg-panel p-4 text-left transition-colors
                   border-cy/30 hover:border-cy active:scale-[0.99] touch-manipulation
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cy
@@ -39,6 +39,8 @@ export function SessionCard({ session, onOpen }: Props) {
 
       <h2 className="mt-3 font-hud text-xl uppercase tracking-wider text-txt truncate">
         {session.name}
+        <span className="text-yl mx-0.5">@</span>
+        <span className="text-cy">{session.hostname}</span>
       </h2>
 
       <p className="mt-2 line-clamp-2 font-mono text-xs text-cy/80">

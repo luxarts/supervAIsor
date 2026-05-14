@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -20,13 +19,12 @@ var upgrader = websocket.Upgrader{
 }
 
 // Handler is the HTTP handler for the /ws/ingest WebSocket endpoint.
-// It enforces a single-writer policy and processes ingest envelopes from the
-// host poller, applying state derivation, persisting, and broadcasting updates.
+// It processes ingest envelopes from host pollers, applying state derivation,
+// persisting, and broadcasting updates. Multiple concurrent pollers are
+// supported; sessions are keyed by (hostname, session_id).
 type Handler struct {
 	Store *store.SQLite
 	Hub   *broadcast.Hub
-
-	connected atomic.Bool
 }
 
 type updateFrame struct {
@@ -36,13 +34,6 @@ type updateFrame struct {
 
 // Serve handles a single /ws/ingest WebSocket connection.
 func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
-	// Single-writer guard — reject second poller with 409.
-	if !h.connected.CompareAndSwap(false, true) {
-		http.Error(w, "ingest already connected", http.StatusConflict)
-		return
-	}
-	defer h.connected.Store(false)
-
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("ingest upgrade: %v", err)
@@ -63,7 +54,12 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		prev, _ := h.Store.GetSession(ctx, env.SessionID)
+		if env.Hostname == "" {
+			log.Printf("ingest: missing hostname for session_id=%s; dropping", env.SessionID)
+			continue
+		}
+
+		prev, _ := h.Store.GetSession(ctx, env.Hostname, env.SessionID)
 		next, err := state.Apply(prev, env)
 		if err != nil {
 			log.Printf("ingest: apply: %v", err)
@@ -77,7 +73,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			log.Printf("ingest: upsert: %v", err)
 			continue
 		}
-		if err := h.Store.AppendEvent(ctx, env.SessionID, next.LastEventAt, peekType(env.Raw), env.Raw); err != nil {
+		if err := h.Store.AppendEvent(ctx, env.Hostname, env.SessionID, next.LastEventAt, peekType(env.Raw), env.Raw); err != nil {
 			log.Printf("ingest: append event: %v", err)
 		}
 
@@ -96,4 +92,3 @@ func peekType(raw json.RawMessage) string {
 	_ = json.Unmarshal(raw, &head)
 	return head.Type
 }
-
