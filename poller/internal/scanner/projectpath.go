@@ -23,10 +23,6 @@ func ResolveProjectPath(encoded string) string {
 	}
 
 	parts := strings.Split(encoded, "-")
-	if len(parts) < 2 {
-		return strings.ReplaceAll(encoded, "-", "/")
-	}
-
 	current := "/"
 	i := 1
 	for i < len(parts) {
