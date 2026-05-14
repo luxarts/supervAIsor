@@ -19,10 +19,16 @@ type SQLite struct {
 
 // Open opens (or creates) a SQLite database at path and applies the schema.
 func Open(path string) (*SQLite, error) {
-	db, err := sql.Open("sqlite", path)
+	// Enable WAL and a busy timeout so concurrent writers (multiple pollers)
+	// do not immediately fail with SQLITE_BUSY.
+	dsn := path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
+	// Serialize writes through a single connection — modernc.org/sqlite uses
+	// per-connection handles, and SQLite only allows one writer at a time.
+	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
