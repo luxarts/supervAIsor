@@ -61,6 +61,7 @@ describe("ConversationModal", () => {
         hostname="mac-A"
         sessionName="my-sess"
         project="/Users/u/Projects/foo"
+        lastEventAt="2026-05-14T12:00:02Z"
         backendHttpBase="http://localhost:8080"
         onClose={() => {}}
       />,

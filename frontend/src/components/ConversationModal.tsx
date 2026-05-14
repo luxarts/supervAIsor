@@ -30,6 +30,7 @@ interface Props {
   hostname: string;
   sessionName: string;
   project: string;
+  lastEventAt: string;
   backendHttpBase: string;
   onClose: () => void;
 }
@@ -39,6 +40,7 @@ export function ConversationModal({
   hostname,
   sessionName,
   project,
+  lastEventAt,
   backendHttpBase,
   onClose,
 }: Props) {
@@ -47,10 +49,16 @@ export function ConversationModal({
   const bodyRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
+  // Reset loading state only when switching to a different session.
   useEffect(() => {
-    let cancelled = false;
     setEvents(null);
     setError(null);
+  }, [sessionId, hostname]);
+
+  // Refetch on mount, on session change, and whenever the underlying session
+  // gets a new event (lastEventAt changes via the WS-driven props).
+  useEffect(() => {
+    let cancelled = false;
     fetch(
       `${backendHttpBase}/sessions/${encodeURIComponent(hostname)}/${encodeURIComponent(sessionId)}/events?limit=500&_=${Date.now()}`,
       { cache: "no-store" },
@@ -68,7 +76,7 @@ export function ConversationModal({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, hostname, backendHttpBase]);
+  }, [sessionId, hostname, lastEventAt, backendHttpBase]);
 
   useEffect(() => {
     if (events && bodyRef.current) {

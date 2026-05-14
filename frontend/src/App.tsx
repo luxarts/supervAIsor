@@ -92,6 +92,7 @@ export default function App() {
           hostname={openSession.hostname}
           sessionName={openSession.name}
           project={openSession.project}
+          lastEventAt={openSession.last_event_at}
           backendHttpBase={HTTP_BASE}
           onClose={() => setOpen(null)}
         />
