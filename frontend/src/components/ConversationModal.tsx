@@ -27,6 +27,7 @@ interface Event {
 
 interface Props {
   sessionId: string;
+  hostname: string;
   sessionName: string;
   project: string;
   backendHttpBase: string;
@@ -35,6 +36,7 @@ interface Props {
 
 export function ConversationModal({
   sessionId,
+  hostname,
   sessionName,
   project,
   backendHttpBase,
@@ -50,7 +52,7 @@ export function ConversationModal({
     setEvents(null);
     setError(null);
     fetch(
-      `${backendHttpBase}/sessions/${encodeURIComponent(sessionId)}/events?limit=500&_=${Date.now()}`,
+      `${backendHttpBase}/sessions/${encodeURIComponent(hostname)}/${encodeURIComponent(sessionId)}/events?limit=500&_=${Date.now()}`,
       { cache: "no-store" },
     )
       .then(async (r) => {
@@ -66,7 +68,7 @@ export function ConversationModal({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, backendHttpBase]);
+  }, [sessionId, hostname, backendHttpBase]);
 
   useEffect(() => {
     if (events && bodyRef.current) {

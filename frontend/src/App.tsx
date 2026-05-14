@@ -89,6 +89,7 @@ export default function App() {
       {openSession && (
         <ConversationModal
           sessionId={openSession.id}
+          hostname={openSession.hostname}
           sessionName={openSession.name}
           project={openSession.project}
           backendHttpBase={HTTP_BASE}
