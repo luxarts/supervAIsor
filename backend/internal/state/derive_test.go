@@ -129,3 +129,41 @@ func TestApply_ToolResult_ClearsPending(t *testing.T) {
 		t.Errorf("Status should not still be working after last tool_result cleared")
 	}
 }
+
+func TestRecomputeStatus_IdleAfter30s(t *testing.T) {
+	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
+	s := &Session{
+		Status:            StatusWaitingInput,
+		LastEventAt:       now.Add(-31 * time.Second),
+		PendingToolUseIDs: map[string]struct{}{},
+	}
+	RecomputeStatus(s, now)
+	if s.Status != StatusIdle {
+		t.Errorf("Status = %q, want idle", s.Status)
+	}
+}
+
+func TestRecomputeStatus_StaleAfter1h(t *testing.T) {
+	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
+	s := &Session{
+		Status:            StatusIdle,
+		LastEventAt:       now.Add(-2 * time.Hour),
+		PendingToolUseIDs: map[string]struct{}{},
+	}
+	RecomputeStatus(s, now)
+	if s.Status != StatusStale {
+		t.Errorf("Status = %q, want stale", s.Status)
+	}
+}
+
+func TestRecomputeStatus_WorkingNotDowngraded(t *testing.T) {
+	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
+	s := &Session{
+		LastEventAt:       now.Add(-2 * time.Hour),
+		PendingToolUseIDs: map[string]struct{}{"x": {}},
+	}
+	RecomputeStatus(s, now)
+	if s.Status != StatusWorking {
+		t.Errorf("Status = %q, want working (pending tool_use overrides time)", s.Status)
+	}
+}
