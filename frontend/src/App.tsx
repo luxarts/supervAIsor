@@ -7,9 +7,14 @@ import { ConversationModal } from "./components/ConversationModal";
 import { shortProject } from "./lib/path";
 import { backendHttpBase } from "./lib/backendUrl";
 
+function defaultWsUrl(): string {
+  if (typeof window === "undefined") return "ws://localhost:8080/ws/clients";
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.hostname}:8080/ws/clients`;
+}
+
 const WS_URL =
-  (import.meta.env.VITE_BACKEND_WS as string | undefined) ??
-  "ws://localhost:8080/ws/clients";
+  (import.meta.env.VITE_BACKEND_WS as string | undefined) ?? defaultWsUrl();
 
 const HTTP_BASE = backendHttpBase(WS_URL);
 const HIDE_STALE_KEY = "sv:hideStale";
