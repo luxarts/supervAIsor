@@ -15,7 +15,7 @@ interface RawLine {
   type?: string;
   message?: {
     role?: string;
-    content?: ContentBlock[];
+    content?: string | ContentBlock[];
   };
 }
 
@@ -192,7 +192,15 @@ export function ConversationModal({
 
 function MessageView({ ev }: { ev: Event }) {
   const role = ev.payload?.message?.role ?? ev.payload?.type ?? ev.type;
-  const blocks = ev.payload?.message?.content ?? [];
+  const raw = ev.payload?.message?.content;
+
+  // Plain user prompts come as a single string; normalize to a text block.
+  const blocks: ContentBlock[] =
+    typeof raw === "string"
+      ? raw.trim()
+        ? [{ type: "text", text: raw }]
+        : []
+      : raw ?? [];
 
   if (blocks.length === 0) return null;
 
