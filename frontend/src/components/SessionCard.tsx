@@ -2,8 +2,14 @@ import { useEffect, useState } from "react";
 import type { Session } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { formatDuration } from "../lib/time";
+import { shortProject } from "../lib/path";
 
-export function SessionCard({ session }: { session: Session }) {
+interface Props {
+  session: Session;
+  onOpen: (id: string) => void;
+}
+
+export function SessionCard({ session, onOpen }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -16,15 +22,19 @@ export function SessionCard({ session }: { session: Session }) {
     : null;
 
   return (
-    <article
-      key={session.id}
-      className={`relative min-h-[160px] border bg-bg-panel p-4 transition-colors
-                  border-cy/30 hover:border-cy active:scale-[0.99]
+    <button
+      type="button"
+      onClick={() => onOpen(session.id)}
+      className={`relative min-h-[160px] w-full border bg-bg-panel p-4 text-left transition-colors
+                  border-cy/30 hover:border-cy active:scale-[0.99] touch-manipulation
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cy
                   ${session.status === "working" ? "shadow-[0_0_18px_rgba(0,240,255,0.25)]" : ""}`}
     >
       <header className="flex items-start justify-between gap-2">
         <StatusBadge status={session.status} />
-        <div className="font-hud text-[10px] text-dim truncate max-w-[55%]">{session.project}</div>
+        <div className="font-hud text-[10px] text-dim truncate max-w-[55%]">
+          {shortProject(session.project)}
+        </div>
       </header>
 
       <h2 className="mt-3 font-hud text-xl uppercase tracking-wider text-txt truncate">
@@ -47,6 +57,6 @@ export function SessionCard({ session }: { session: Session }) {
           </div>
         )}
       </footer>
-    </article>
+    </button>
   );
 }
