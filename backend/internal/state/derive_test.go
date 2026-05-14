@@ -167,3 +167,20 @@ func TestRecomputeStatus_WorkingNotDowngraded(t *testing.T) {
 		t.Errorf("Status = %q, want working (pending tool_use overrides time)", s.Status)
 	}
 }
+
+func TestApply_SetsHostnameOnFirstEvent(t *testing.T) {
+	now := time.Now().UTC()
+	env := events.IngestEnvelope{
+		Hostname:  "mac-A",
+		SessionID: "s1",
+		FileMTime: now,
+		Raw:       json.RawMessage(`{"type":"user","timestamp":"` + now.Format(time.RFC3339) + `"}`),
+	}
+	got, err := Apply(nil, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Hostname != "mac-A" {
+		t.Errorf("Hostname = %q, want mac-A", got.Hostname)
+	}
+}
