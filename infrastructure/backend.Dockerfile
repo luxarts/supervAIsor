@@ -7,9 +7,8 @@ RUN go mod download
 COPY backend/ ./
 RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12
 COPY --from=build /out/server /server
 EXPOSE 8080
 ENV DB_PATH=/var/lib/supervaisor/data.db
-USER nonroot
 ENTRYPOINT ["/server"]
