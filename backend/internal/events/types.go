@@ -7,6 +7,7 @@ import (
 
 // IngestEnvelope is one message the poller sends over /ws/ingest.
 type IngestEnvelope struct {
+	Hostname   string          `json:"hostname"`
 	SessionID  string          `json:"session_id"`
 	ProjectDir string          `json:"project_dir"`
 	FileMTime  time.Time       `json:"file_mtime"`
