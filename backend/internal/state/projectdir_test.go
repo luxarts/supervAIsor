@@ -15,3 +15,16 @@ func TestDecodeProjectDir(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodeProjectDir_AbsolutePathPassthrough(t *testing.T) {
+	cases := map[string]string{
+		"/Users/lucasbacelo/Projects/ai-dream-team": "/Users/lucasbacelo/Projects/ai-dream-team",
+		"/Users/lucasbacelo/Projects":               "/Users/lucasbacelo/Projects",
+	}
+	for in, want := range cases {
+		got := DecodeProjectDir(in)
+		if got != want {
+			t.Fatalf("DecodeProjectDir(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

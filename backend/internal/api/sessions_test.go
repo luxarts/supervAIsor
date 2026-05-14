@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,5 +91,54 @@ func TestGetSessions_Empty(t *testing.T) {
 	// Must return JSON array, not null.
 	if w.Body.String() != "[]\n" && w.Body.String() != "[]" {
 		t.Errorf("expected empty array, got %q", w.Body.String())
+	}
+}
+
+func TestGetSessionEvents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	st, err := store.Open(filepath.Join(dir, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	sess := &state.Session{
+		ID:            "abc",
+		Name:          "s",
+		Project:       "/tmp/p",
+		Status:        "idle",
+		StartedAt:     now,
+		LastEventAt:   now,
+		CurrentAction: "",
+	}
+	if err := st.UpsertSession(ctx, sess); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AppendEvent(ctx, "abc", now, "user", []byte(`{"text":"hi"}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	r := gin.New()
+	(&Handler{Store: st}).Register(r)
+
+	req := httptest.NewRequest("GET", "/sessions/abc/events", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"hi"`) {
+		t.Fatalf("body missing event payload: %s", w.Body.String())
+	}
+
+	req2 := httptest.NewRequest("GET", "/sessions/does-not-exist/events", nil)
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w2.Code)
 	}
 }

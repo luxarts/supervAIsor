@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -150,4 +151,49 @@ func (s *SQLite) AppendEvent(ctx context.Context, sessionID string, ts time.Time
 		sessionID, ts, eventType, string(payload),
 	)
 	return err
+}
+
+// Event is one row from the events table, returned by ListEvents.
+type Event struct {
+	TS      time.Time       `json:"ts"`
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+// ListEvents returns the most recent events for a session, in chronological
+// (ts ASC) order, capped at limit. When the session has more events than
+// limit, the older ones are dropped so the modal always shows the tail of
+// the conversation.
+func (s *SQLite) ListEvents(ctx context.Context, sessionID string, limit int) ([]Event, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT ts, type, payload FROM events WHERE session_id = ? ORDER BY ts DESC LIMIT ?`,
+		sessionID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Event
+	for rows.Next() {
+		var (
+			ts      time.Time
+			typ     string
+			payload string
+		)
+		if err := rows.Scan(&ts, &typ, &payload); err != nil {
+			return nil, err
+		}
+		out = append(out, Event{TS: ts, Type: typ, Payload: json.RawMessage(payload)})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Reverse to ASC for the caller.
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
 }

@@ -10,3 +10,20 @@ html, body, #root {
   color: #e6f9ff;
   font-family: "JetBrains Mono", monospace;
 }
+
+.md { line-height: 1.45; overflow-wrap: anywhere; word-break: break-word; }
+.md strong { color: #fcee0a; font-weight: 700; }
+.md em { color: #00f0ff; font-style: italic; }
+.md code { background: rgba(0, 240, 255, 0.1); padding: 0 4px; border-radius: 2px; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.md a { color: #00f0ff; text-decoration: underline; overflow-wrap: anywhere; }
+.md ul, .md ol { list-style-position: outside; padding-left: 1.75rem; margin: 0.25rem 0; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md li { margin: 0.15rem 0; padding-left: 0.25rem; }
+.md li::marker { color: #00f0ff; }
+.md p { margin: 0.4rem 0; }
+.md p:first-child { margin-top: 0; }
+.md p:last-child { margin-bottom: 0; }
+.md pre { background: rgba(0, 0, 0, 0.4); padding: 0.5rem; overflow-x: auto; border-radius: 2px; max-width: 100%; white-space: pre-wrap; word-break: break-all; }
+.md pre code { background: transparent; padding: 0; }
+.md blockquote { border-left: 2px solid rgba(0, 240, 255, 0.4); padding-left: 0.5rem; color: #888; }
