@@ -104,12 +104,16 @@ func TestListEvents(t *testing.T) {
 		t.Fatalf("events not ordered by ts ASC: %+v", evs)
 	}
 
+	// Limit returns the TAIL (most recent) in ASC order.
 	evs2, err := s.ListEvents(ctx, "sess-A", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(evs2) != 2 {
 		t.Fatalf("limit not honored, got %d", len(evs2))
+	}
+	if string(evs2[0].Payload) != `{"n":3}` || string(evs2[1].Payload) != `{"n":2}` {
+		t.Fatalf("expected last 2 events (n=3 then n=2), got %+v", evs2)
 	}
 }
 

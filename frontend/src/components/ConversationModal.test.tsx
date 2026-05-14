@@ -54,7 +54,7 @@ describe("ConversationModal", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders messages with markdown and omits tool_result", async () => {
+  it("renders text messages with markdown and hides tool noise", async () => {
     render(
       <ConversationModal
         sessionId="abc"
@@ -70,7 +70,8 @@ describe("ConversationModal", () => {
     const bold = await screen.findByText("bold");
     expect(bold.tagName).toBe("STRONG");
 
-    expect(screen.getByText(/▶\s*Bash/)).toBeTruthy();
+    // Tool calls and tool results are both hidden in v1.
+    expect(screen.queryByText(/▶\s*Bash/)).toBeNull();
     expect(screen.queryByText(/should be hidden/)).toBeNull();
   });
 });

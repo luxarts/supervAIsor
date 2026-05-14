@@ -207,7 +207,9 @@ function MessageView({ ev }: { ev: Event }) {
 
   if (blocks.length === 0) return null;
 
-  const renderable = blocks.filter((b) => b.type !== "tool_result");
+  // Keep only conversational text. Tool calls/results are noisy and not
+  // useful in a chat-style view.
+  const renderable = blocks.filter((b) => b.type === "text");
   if (renderable.length === 0) return null;
 
   const isAssistant = role === "assistant";
@@ -222,25 +224,13 @@ function MessageView({ ev }: { ev: Event }) {
     >
       <div className={`mb-2 font-hud text-[10px] uppercase ${text}`}>{role}</div>
       <div className="space-y-2 min-w-0">
-        {renderable.map((b, i) => {
-          if (b.type === "text") {
-            return (
-              <div key={i} className="md text-sm break-words min-w-0">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {b.text ?? ""}
-                </ReactMarkdown>
-              </div>
-            );
-          }
-          if (b.type === "tool_use") {
-            return (
-              <div key={i} className="font-mono text-xs text-dim">
-                ▶ {b.name ?? "tool"}
-              </div>
-            );
-          }
-          return null;
-        })}
+        {renderable.map((b, i) => (
+          <div key={i} className="md text-sm break-words min-w-0">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {b.text ?? ""}
+            </ReactMarkdown>
+          </div>
+        ))}
       </div>
     </div>
   );
