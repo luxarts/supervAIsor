@@ -1,14 +1,22 @@
 # supervAIsor
-Platform to supervise the current Agents working in a project with Claude Code using a game-like interface inspired by the style of RTS and ARPG.
 
-# Features
-- Web UI
-- Connect with Claude Code to represent each agent and watch the current status
-- Add agents with a GUI like creating an NPC in Age of Empires
-- Define types (different sets of skills) for agents to create them faster
-- Create the world based on the project (infrastructure, rooms, jobs and work stations, etc)
+Mobile-first Cyberpunk 2077-themed dashboard for monitoring local Claude Code sessions.
 
-# Project structure
-|-backend - Contains the backend (Go) for the platform
-|-frontend - Contains the frontend (NodeJS - React) for the platform
-|-infrastructure - Contains the Dockerfiles, compose, settings and other devops related stuff
+## Architecture
+
+    host poller  ──ws──►  backend (Docker)  ◄──ws──  frontend (Docker)
+                        └─ SQLite (volume)
+
+- **`poller/`** — host-native Go binary; tails `~/.claude/projects/**/*.jsonl`.
+- **`backend/`** — Go (Gin + WS), derives session state, persists to SQLite, broadcasts to clients.
+- **`frontend/`** — React + Vite, Cyberpunk 2077 theme, mobile-first.
+- **`infrastructure/`** — Docker Compose.
+
+## Quickstart
+
+```bash
+make up              # starts backend + frontend
+make poller-install  # installs poller into ~/.local/bin
+supervaisor-poller   # run it
+open http://localhost:5173
+```
