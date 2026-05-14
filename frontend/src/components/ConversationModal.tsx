@@ -49,7 +49,10 @@ export function ConversationModal({
     let cancelled = false;
     setEvents(null);
     setError(null);
-    fetch(`${backendHttpBase}/sessions/${encodeURIComponent(sessionId)}/events?limit=500`)
+    fetch(
+      `${backendHttpBase}/sessions/${encodeURIComponent(sessionId)}/events?limit=500&_=${Date.now()}`,
+      { cache: "no-store" },
+    )
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return (await r.json()) as Event[];

@@ -65,5 +65,6 @@ func (h *Handler) getSessionEvents(c *gin.Context) {
 	if evs == nil {
 		evs = []store.Event{}
 	}
+	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, evs)
 }
