@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -150,4 +151,39 @@ func (s *SQLite) AppendEvent(ctx context.Context, sessionID string, ts time.Time
 		sessionID, ts, eventType, string(payload),
 	)
 	return err
+}
+
+// Event is one row from the events table, returned by ListEvents.
+type Event struct {
+	TS      time.Time       `json:"ts"`
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+// ListEvents returns events for a session ordered by ts ASC, capped at limit.
+func (s *SQLite) ListEvents(ctx context.Context, sessionID string, limit int) ([]Event, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT ts, type, payload FROM events WHERE session_id = ? ORDER BY ts ASC LIMIT ?`,
+		sessionID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Event
+	for rows.Next() {
+		var (
+			ts      time.Time
+			typ     string
+			payload string
+		)
+		if err := rows.Scan(&ts, &typ, &payload); err != nil {
+			return nil, err
+		}
+		out = append(out, Event{TS: ts, Type: typ, Payload: json.RawMessage(payload)})
+	}
+	return out, rows.Err()
 }

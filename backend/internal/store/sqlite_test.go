@@ -70,6 +70,49 @@ func TestGetSession_NotFound_ReturnsNil(t *testing.T) {
 	}
 }
 
+func TestListEvents(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	mustAppend := func(sid string, offset time.Duration, typ, payload string) {
+		if err := s.AppendEvent(ctx, sid, now.Add(offset), typ, []byte(payload)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustAppend("sess-A", 0, "user", `{"n":1}`)
+	mustAppend("sess-A", 2*time.Second, "assistant", `{"n":2}`)
+	mustAppend("sess-A", time.Second, "user", `{"n":3}`)
+	mustAppend("sess-B", 0, "user", `{"n":99}`)
+
+	evs, err := s.ListEvents(ctx, "sess-A", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs) != 3 {
+		t.Fatalf("got %d events, want 3", len(evs))
+	}
+	if string(evs[0].Payload) != `{"n":1}` ||
+		string(evs[1].Payload) != `{"n":3}` ||
+		string(evs[2].Payload) != `{"n":2}` {
+		t.Fatalf("events not ordered by ts ASC: %+v", evs)
+	}
+
+	evs2, err := s.ListEvents(ctx, "sess-A", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs2) != 2 {
+		t.Fatalf("limit not honored, got %d", len(evs2))
+	}
+}
+
 func TestAppendEvent_RoundTrip(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
