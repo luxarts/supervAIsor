@@ -48,13 +48,14 @@ func (s *Scanner) RunOnce() error {
 		if err != nil {
 			continue
 		}
+		resolvedProject := ResolveProjectPath(e.Name())
 		for _, f := range files {
 			if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
 				continue
 			}
 			path := filepath.Join(dirPath, f.Name())
 			sessionID := strings.TrimSuffix(f.Name(), ".jsonl")
-			if err := s.processFile(path, e.Name(), sessionID); err != nil {
+			if err := s.processFile(path, resolvedProject, sessionID); err != nil {
 				log.Printf("process %s: %v", path, err)
 			}
 		}
