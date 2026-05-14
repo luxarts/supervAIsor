@@ -38,7 +38,7 @@ export function SessionCard({ session, onOpen }: Props) {
       </header>
 
       <h2 className="mt-3 font-hud text-xl uppercase tracking-wider text-txt truncate">
-        {session.name}
+        {session.name}@{session.hostname}
       </h2>
 
       <p className="mt-2 line-clamp-2 font-mono text-xs text-cy/80">
