@@ -58,7 +58,11 @@ cd poller
 go run ./cmd/poller   # or: make poller-install && supervaisor-poller
 ```
 
-Flags: `-projects-dir`, `-state-file`, `-backend`, `-interval`.
+Flags: `-projects-dir`, `-state-file`, `-backend-host`, `-backend-port`, `-backend` (full WS URL override), `-hostname`, `-interval`.
+
+Env vars (override defaults; flags still take precedence over env): `SUPERVAISOR_PROJECTS_DIR`, `SUPERVAISOR_STATE_FILE`, `SUPERVAISOR_BACKEND_HOST`, `SUPERVAISOR_BACKEND_PORT`, `SUPERVAISOR_BACKEND_URL`, `SUPERVAISOR_HOSTNAME`, `SUPERVAISOR_INTERVAL`. Example: `SUPERVAISOR_BACKEND_HOST=10.0.0.5 SUPERVAISOR_HOSTNAME=mac-A make poller`.
+
+`-hostname` defaults to the OS hostname with a trailing `.local` stripped (macOS-friendly). Multiple pollers on different machines can target the same backend concurrently.
 
 ### Frontend (React/Vite)
 

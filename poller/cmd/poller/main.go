@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -27,7 +28,12 @@ type Config struct {
 	Interval    time.Duration
 }
 
-func loadConfig(args []string) (Config, error) {
+// loadConfig resolves configuration in precedence order: flag > env > default.
+// Env vars are prefixed with SUPERVAISOR_, e.g. SUPERVAISOR_BACKEND_HOST.
+func loadConfig(args []string, getenv func(string) string) (Config, error) {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
 	home, _ := os.UserHomeDir()
 	c := Config{
 		ProjectsDir: filepath.Join(home, ".claude", "projects"),
@@ -36,14 +42,45 @@ func loadConfig(args []string) (Config, error) {
 		BackendPort: 8080,
 		Interval:    time.Second,
 	}
+
+	if v := getenv("SUPERVAISOR_PROJECTS_DIR"); v != "" {
+		c.ProjectsDir = v
+	}
+	if v := getenv("SUPERVAISOR_STATE_FILE"); v != "" {
+		c.StateFile = v
+	}
+	if v := getenv("SUPERVAISOR_BACKEND_HOST"); v != "" {
+		c.BackendHost = v
+	}
+	if v := getenv("SUPERVAISOR_BACKEND_PORT"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return c, fmt.Errorf("SUPERVAISOR_BACKEND_PORT: %w", err)
+		}
+		c.BackendPort = n
+	}
+	if v := getenv("SUPERVAISOR_BACKEND_URL"); v != "" {
+		c.BackendURL = v
+	}
+	if v := getenv("SUPERVAISOR_HOSTNAME"); v != "" {
+		c.Hostname = v
+	}
+	if v := getenv("SUPERVAISOR_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return c, fmt.Errorf("SUPERVAISOR_INTERVAL: %w", err)
+		}
+		c.Interval = d
+	}
+
 	fs := flag.NewFlagSet("poller", flag.ContinueOnError)
-	fs.StringVar(&c.ProjectsDir, "projects-dir", c.ProjectsDir, "Claude projects dir")
-	fs.StringVar(&c.StateFile, "state-file", c.StateFile, "Offset state file")
-	fs.StringVar(&c.BackendHost, "backend-host", c.BackendHost, "Backend host")
-	fs.IntVar(&c.BackendPort, "backend-port", c.BackendPort, "Backend port")
-	fs.StringVar(&c.BackendURL, "backend", "", "Backend WS URL (overrides host+port)")
-	fs.StringVar(&c.Hostname, "hostname", "", "Hostname tag (default: OS hostname, .local stripped)")
-	fs.DurationVar(&c.Interval, "interval", c.Interval, "Poll interval")
+	fs.StringVar(&c.ProjectsDir, "projects-dir", c.ProjectsDir, "Claude projects dir (env: SUPERVAISOR_PROJECTS_DIR)")
+	fs.StringVar(&c.StateFile, "state-file", c.StateFile, "Offset state file (env: SUPERVAISOR_STATE_FILE)")
+	fs.StringVar(&c.BackendHost, "backend-host", c.BackendHost, "Backend host (env: SUPERVAISOR_BACKEND_HOST)")
+	fs.IntVar(&c.BackendPort, "backend-port", c.BackendPort, "Backend port (env: SUPERVAISOR_BACKEND_PORT)")
+	fs.StringVar(&c.BackendURL, "backend", c.BackendURL, "Backend WS URL, overrides host+port (env: SUPERVAISOR_BACKEND_URL)")
+	fs.StringVar(&c.Hostname, "hostname", c.Hostname, "Hostname tag, default: OS hostname with .local stripped (env: SUPERVAISOR_HOSTNAME)")
+	fs.DurationVar(&c.Interval, "interval", c.Interval, "Poll interval (env: SUPERVAISOR_INTERVAL)")
 	if err := fs.Parse(args); err != nil {
 		return c, err
 	}
@@ -69,9 +106,9 @@ func resolveHostname(c Config) (string, error) {
 }
 
 func main() {
-	cfg, err := loadConfig(os.Args[1:])
+	cfg, err := loadConfig(os.Args[1:], os.Getenv)
 	if err != nil {
-		log.Fatalf("flag parse: %v", err)
+		log.Fatalf("config: %v", err)
 	}
 	host, err := resolveHostname(cfg)
 	if err != nil {
