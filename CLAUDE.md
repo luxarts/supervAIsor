@@ -1,54 +1,96 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository.
 
 ## Project Overview
 
-**supervAIsor** is an AI agent supervision platform with a game-like interface (inspired by RTS/ARPG games like Age of Empires). It integrates with Claude Code to visually monitor and manage multiple AI agents working on a project.
+**supervAIsor** is a mobile-first, Cyberpunk 2077-themed dashboard for monitoring local Claude Code sessions. A host-native poller tails Claude's JSONL session files, ships events to a backend, which derives session state and broadcasts updates to a web UI.
 
-## Planned Architecture
+It is **read-only monitoring** — it does not spawn, kill, or control sessions.
 
-The project is split into three top-level directories:
+## Architecture
 
-- `backend/` — Go-based API server
-- `frontend/` — React (Node.js) web UI
-- `infrastructure/` — Dockerfiles, Docker Compose, and deployment configuration
+```
+host poller  ──ws──►  backend (Docker)  ◄──ws──  frontend (Docker)
+                    └─ SQLite (volume)
+```
 
-### Key Concepts
+Three processes:
 
-- **Agents**: Represent Claude Code instances working on a project. Agents have types (skill sets) and are managed visually like NPCs.
-- **World**: A project-based virtual environment with rooms, workstations, and infrastructure.
-- **Agent Types**: Predefined skill configurations used to create agents faster.
+- **`poller/`** — host-native Go binary. Tails `~/.claude/projects/*/*.jsonl`, persists per-file read offsets in `~/.supervAIsor/poller-state.json`, ships envelopes over `ws://backend/ws/ingest`. Must run on the host (not in a container) for filesystem access.
+- **`backend/`** — Go (Gin + gorilla/websocket). Endpoints: `GET /healthz`, `GET /sessions`, `WS /ws/ingest` (single-writer), `WS /ws/clients` (fan-out). Pure state derivation lives in `internal/state/`. Persistence via SQLite (`modernc.org/sqlite`, no CGO).
+- **`frontend/`** — React 19 + Vite + TypeScript + Tailwind. Cyberpunk 2077 palette (cyan `#00f0ff`, yellow `#fcee0a`, red `#ff003c` on black). Mobile-first; cards ≥160 px; touch targets ≥44 px.
+
+Session status values (derived in `internal/state/derive.go`):
+
+| Status | Trigger |
+|---|---|
+| `working` | unmatched `tool_use` is pending |
+| `waiting_input` | last event < 30 s ago, no pending tool |
+| `idle` | last event between 30 s and 1 h ago |
+| `stale` | last event > 1 h ago |
 
 ## Development Commands
 
-> These commands will be defined as the project is built out. Update this section as `backend/`, `frontend/`, and `infrastructure/` are scaffolded.
+### One-shot
+
+```bash
+make up              # docker compose: backend + frontend
+make poller          # run the host poller (foreground)
+make down            # stop containers
+make test            # backend + poller + frontend tests
+```
 
 ### Backend (Go)
+
 ```bash
-# From backend/
-go run .          # Run the server
-go test ./...     # Run all tests
-go build -o bin/supervaisor .  # Build binary
+cd backend
+go test ./...                # unit + integration tests
+DB_PATH=/tmp/sv.db go run ./cmd/server
 ```
 
-### Frontend (Node.js/React)
+Env vars: `PORT` (default `8080`), `DB_PATH` (default `/var/lib/supervaisor/data.db`).
+
+### Poller (Go, host)
+
 ```bash
-# From frontend/
-npm install       # Install dependencies
-npm run dev       # Start dev server
-npm run build     # Production build
-npm test          # Run tests
+cd poller
+go run ./cmd/poller   # or: make poller-install && supervaisor-poller
 ```
 
-### Infrastructure
+Flags: `-projects-dir`, `-state-file`, `-backend`, `-interval`.
+
+### Frontend (React/Vite)
+
 ```bash
-docker compose up        # Start all services
-docker compose down      # Stop all services
+cd frontend
+npm install
+npm run dev    # http://localhost:5173
+npm run build
+npx vitest run
 ```
+
+`VITE_BACKEND_WS` env var overrides the WS URL (default `ws://localhost:8080/ws/clients`).
 
 ## Implementation Notes
 
-- The UI design is intentionally game-like — prioritize real-time feedback, visual agent status, and interactive agent management.
-- Backend should expose a WebSocket or SSE endpoint for live agent status updates to the frontend.
-- Claude Code integration: agents are represented by Claude Code processes; the platform tracks their state and output.
+- **No auth.** Single-user, local-only.
+- **Ingest is single-writer.** The backend rejects a second poller with HTTP 409.
+- **State derivation is pure** (`internal/state/derive.go`). The ingest handler is the only place that calls `Apply()` and `RecomputeStatus()`.
+- The frontend recomputes elapsed-time counters on a 1 s tick using `started_at` / `last_prompt_at` from the backend — the backend does not push ticks.
+- Distroless backend container runs as root because the named volume's mount overrides UID ownership.
+
+## Project Layout
+
+```
+backend/       — Go server, internal/{state,events,store,broadcast,ingest,api}
+poller/        — Go binary, internal/{offsets,tailer,wsclient,scanner}
+frontend/      — Vite + React + Tailwind
+infrastructure/— backend.Dockerfile + docker-compose.yml
+docs/          — superpowers/specs/ + superpowers/plans/
+```
+
+## Design and Plan Documents
+
+- Spec: `docs/superpowers/specs/2026-05-14-cyberpunk-session-monitor-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-cyberpunk-session-monitor.md`
