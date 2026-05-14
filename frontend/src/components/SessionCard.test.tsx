@@ -15,8 +15,11 @@ const sess: Session = {
 };
 
 describe("SessionCard", () => {
-  it("renders name@hostname", () => {
-    render(<SessionCard session={sess} onOpen={() => {}} />);
-    expect(screen.getByText("feature-x@mac-A")).toBeTruthy();
+  it("renders name@hostname with @ and hostname styled differently", () => {
+    const { container } = render(<SessionCard session={sess} onOpen={() => {}} />);
+    const h2 = container.querySelector("h2");
+    expect(h2?.textContent).toBe("feature-x@mac-A");
+    expect(h2?.querySelector(".text-yl")?.textContent).toBe("@");
+    expect(h2?.querySelector(".text-cy")?.textContent).toBe("mac-A");
   });
 });
