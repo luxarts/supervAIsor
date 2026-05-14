@@ -6,7 +6,7 @@ import { shortProject } from "../lib/path";
 
 interface Props {
   session: Session;
-  onOpen: (id: string) => void;
+  onOpen: () => void;
 }
 
 export function SessionCard({ session, onOpen }: Props) {
@@ -24,7 +24,7 @@ export function SessionCard({ session, onOpen }: Props) {
   return (
     <button
       type="button"
-      onClick={() => onOpen(session.id)}
+      onClick={onOpen}
       className={`relative min-h-[160px] w-full border bg-bg-panel p-4 text-left transition-colors
                   border-cy/30 hover:border-cy active:scale-[0.99] touch-manipulation
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cy

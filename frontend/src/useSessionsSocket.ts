@@ -32,14 +32,18 @@ export function useSessionsSocket(url: string): SocketState {
             setSessions(frame.sessions);
           } else if (frame.kind === "update") {
             setSessions((prev) => {
-              const idx = prev.findIndex((s) => s.id === frame.session.id);
+              const key = (s: Session) => `${s.hostname}:${s.id}`;
+              const target = key(frame.session);
+              const idx = prev.findIndex((s) => key(s) === target);
               if (idx < 0) return [frame.session, ...prev];
               const copy = prev.slice();
               copy[idx] = frame.session;
               return copy;
             });
           } else if (frame.kind === "delete") {
-            setSessions((prev) => prev.filter((s) => s.id !== frame.session_id));
+            setSessions((prev) =>
+              prev.filter((s) => !(s.id === frame.session_id && s.hostname === frame.hostname)),
+            );
           }
         } catch {
           // ignore malformed frames

@@ -27,7 +27,7 @@ export default function App() {
     return v === null ? true : v === "1";
   });
   const [query, setQuery] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [open, setOpen] = useState<{ hostname: string; id: string } | null>(null);
 
   useEffect(() => {
     localStorage.setItem(HIDE_STALE_KEY, hideStale ? "1" : "0");
@@ -44,8 +44,8 @@ export default function App() {
     });
   }, [sessions, hideStale, query]);
 
-  const openSession = openId
-    ? sessions.find((s) => s.id === openId) ?? null
+  const openSession = open
+    ? sessions.find((s) => s.id === open.id && s.hostname === open.hostname) ?? null
     : null;
 
   return (
@@ -77,7 +77,11 @@ export default function App() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((s) => (
-            <SessionCard key={s.id} session={s} onOpen={setOpenId} />
+            <SessionCard
+              key={`${s.hostname}:${s.id}`}
+              session={s}
+              onOpen={() => setOpen({ hostname: s.hostname, id: s.id })}
+            />
           ))}
         </div>
       )}
@@ -88,7 +92,7 @@ export default function App() {
           sessionName={openSession.name}
           project={openSession.project}
           backendHttpBase={HTTP_BASE}
-          onClose={() => setOpenId(null)}
+          onClose={() => setOpen(null)}
         />
       )}
     </div>
