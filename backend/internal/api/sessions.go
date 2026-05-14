@@ -21,7 +21,7 @@ func (h *Handler) Register(r *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 	r.GET("/sessions", h.listSessions)
-	r.GET("/sessions/:id/events", h.getSessionEvents)
+	r.GET("/sessions/:hostname/:id/events", h.getSessionEvents)
 }
 
 func (h *Handler) listSessions(c *gin.Context) {
@@ -37,10 +37,11 @@ func (h *Handler) listSessions(c *gin.Context) {
 }
 
 func (h *Handler) getSessionEvents(c *gin.Context) {
+	hostname := c.Param("hostname")
 	id := c.Param("id")
 	ctx := c.Request.Context()
 
-	sess, err := h.Store.GetSession(ctx, id)
+	sess, err := h.Store.GetSession(ctx, hostname, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -57,7 +58,7 @@ func (h *Handler) getSessionEvents(c *gin.Context) {
 		}
 	}
 
-	evs, err := h.Store.ListEvents(ctx, id, limit)
+	evs, err := h.Store.ListEvents(ctx, hostname, id, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
