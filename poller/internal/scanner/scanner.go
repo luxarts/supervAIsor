@@ -15,6 +15,7 @@ import (
 
 // Envelope matches the backend's events.IngestEnvelope JSON shape.
 type Envelope struct {
+	Hostname   string          `json:"hostname"`
 	SessionID  string          `json:"session_id"`
 	ProjectDir string          `json:"project_dir"`
 	FileMTime  time.Time       `json:"file_mtime"`
@@ -25,6 +26,7 @@ type Envelope struct {
 // Scanner walks the Claude projects directory and ships new JSONL lines to the
 // backend over a WebSocket connection.
 type Scanner struct {
+	Hostname    string
 	ProjectsDir string
 	Offsets     *offsets.Store
 	OffsetsPath string
@@ -92,6 +94,7 @@ func (s *Scanner) processFile(path, projectDir, sessionID string) error {
 
 	for i, line := range lines {
 		env := Envelope{
+			Hostname:   s.Hostname,
 			SessionID:  sessionID,
 			ProjectDir: projectDir,
 			FileMTime:  fi.ModTime().UTC(),
