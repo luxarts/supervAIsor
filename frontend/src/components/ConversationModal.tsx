@@ -170,7 +170,7 @@ export function ConversationModal({
 
         <div
           ref={bodyRef}
-          className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-3"
+          className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-3 space-y-3"
         >
           {error && (
             <div className="font-hud text-rd">// EVENT FEED LOST: {error}</div>
@@ -205,13 +205,16 @@ function MessageView({ ev }: { ev: Event }) {
   const text = isAssistant ? "text-yl/90" : "text-cy/90";
 
   return (
-    <div className={`max-w-[90%] border ${border} ${alignment} bg-bg-panel/60 p-2`}>
-      <div className={`mb-1 font-hud text-[10px] uppercase ${text}`}>{role}</div>
-      <div className="space-y-2">
+    <div
+      className={`max-w-full border ${border} ${alignment} bg-bg-panel/60 p-2
+                  break-words min-w-0 sm:max-w-[85%]`}
+    >
+      <div className={`mb-2 font-hud text-[10px] uppercase ${text}`}>{role}</div>
+      <div className="space-y-2 min-w-0">
         {renderable.map((b, i) => {
           if (b.type === "text") {
             return (
-              <div key={i} className="md text-sm">
+              <div key={i} className="md text-sm break-words min-w-0">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {b.text ?? ""}
                 </ReactMarkdown>
