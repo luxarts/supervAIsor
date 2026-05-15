@@ -18,7 +18,14 @@ import {
 function defaultWsUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:8080/ws/clients";
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${window.location.hostname}:8080/ws/clients`;
+  // Vite dev server on :5173 talks to the backend on :8080. Everywhere else
+  // (production behind a reverse proxy like traefik) we use same-origin and
+  // share the app's base path (import.meta.env.BASE_URL).
+  if (window.location.port === "5173") {
+    return `${proto}//${window.location.hostname}:8080/ws/clients`;
+  }
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  return `${proto}//${window.location.host}${base}/ws/clients`;
 }
 
 const WS_URL =

@@ -3,20 +3,42 @@ services:
     build:
       context: ..
       dockerfile: infrastructure/backend.Dockerfile
-    ports:
-      - "8080:8080"
     volumes:
       - supervaisor-data:/var/lib/supervaisor
     restart: unless-stopped
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_default"
+      - "traefik.http.routers.supervaisor-backend.rule=PathPrefix(`/supervaisor/sessions`) || PathPrefix(`/supervaisor/healthz`) || PathPrefix(`/supervaisor/ws/`)"
+      - "traefik.http.routers.supervaisor-backend.entrypoints=web"
+      - "traefik.http.routers.supervaisor-backend.priority=100"
+      - "traefik.http.routers.supervaisor-backend.middlewares=supervaisor-strip"
+      - "traefik.http.services.supervaisor-backend.loadbalancer.server.port=8080"
 
   frontend:
     build:
       context: ../frontend
-    ports:
-      - "5173:5173"
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_default"
+      - "traefik.http.routers.supervaisor-frontend.rule=PathPrefix(`/supervaisor`)"
+      - "traefik.http.routers.supervaisor-frontend.entrypoints=web"
+      - "traefik.http.routers.supervaisor-frontend.priority=1"
+      - "traefik.http.routers.supervaisor-frontend.middlewares=supervaisor-strip"
+      - "traefik.http.services.supervaisor-frontend.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.supervaisor-strip.stripprefix.prefixes=/supervaisor"
 
 volumes:
   supervaisor-data:
+
+networks:
+  traefik:
+    name: traefik_default
+    external: true
