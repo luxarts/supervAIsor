@@ -9,8 +9,10 @@ import (
 	"github.com/luxarts/supervaisor/internal/events"
 )
 
-const idleAfter = 30   // seconds
-const staleAfter = 3600 // seconds
+const (
+	workingDebounce = 2 * time.Second
+	staleAfter      = time.Hour
+)
 
 // Apply takes the previous session state (or nil for the first event)
 // and a new event, and returns the next session state. Pure function.
@@ -64,11 +66,10 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 		applyUser(&next, line)
 	}
 
-	// Status derivation: working trumps all if any pending tool_use.
 	if len(next.PendingToolUseIDs) > 0 {
 		next.Status = StatusWorking
 	} else {
-		next.Status = StatusWaitingInput
+		next.Status = StatusDone
 	}
 	return &next, nil
 }
@@ -164,9 +165,10 @@ func shortID(id string) string {
 	return id[:8]
 }
 
-// RecomputeStatus mutates s.Status based on elapsed time since last event.
-// Pending tool_use always wins. Otherwise transitions: waiting_input -> idle
-// after 30s, idle -> stale after 1h.
+// RecomputeStatus mutates s.Status based on pending tool_use and elapsed
+// time since the last event. WORKING when a tool is pending OR the last
+// event was within the debounce window (smooths intra-turn streaming).
+// STALE when older than 1h. DONE otherwise.
 func RecomputeStatus(s *Session, now time.Time) {
 	if len(s.PendingToolUseIDs) > 0 {
 		s.Status = StatusWorking
@@ -174,11 +176,11 @@ func RecomputeStatus(s *Session, now time.Time) {
 	}
 	age := now.Sub(s.LastEventAt)
 	switch {
-	case age >= time.Hour:
+	case age >= staleAfter:
 		s.Status = StatusStale
-	case age >= 30*time.Second:
-		s.Status = StatusIdle
+	case age < workingDebounce:
+		s.Status = StatusWorking
 	default:
-		s.Status = StatusWaitingInput
+		s.Status = StatusDone
 	}
 }

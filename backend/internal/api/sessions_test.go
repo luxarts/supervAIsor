@@ -24,7 +24,7 @@ func TestGetSessions(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	_ = db.UpsertSession(context.Background(), &state.Session{
 		ID: "s1", Hostname: "host-test", Name: "n", Project: "/tmp",
-		Status: state.StatusIdle, StartedAt: now, LastEventAt: now,
+		Status: state.StatusDone, StartedAt: now, LastEventAt: now,
 	})
 
 	h := &Handler{Store: db}

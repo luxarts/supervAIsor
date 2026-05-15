@@ -5,10 +5,9 @@ import "time"
 type Status string
 
 const (
-	StatusWorking      Status = "working"
-	StatusWaitingInput Status = "waiting_input"
-	StatusIdle         Status = "idle"
-	StatusStale        Status = "stale"
+	StatusWorking Status = "working"
+	StatusDone    Status = "done"
+	StatusStale   Status = "stale"
 )
 
 // Session is the derived view of a Claude Code session.

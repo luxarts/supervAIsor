@@ -100,12 +100,13 @@ func TestApply_ToolResult_ClearsPending(t *testing.T) {
 		Status:            StatusWorking,
 		PendingToolUseIDs: map[string]struct{}{"tool_1": {}},
 	}
+	eventTime := now.Add(-3 * time.Second)
 	env := events.IngestEnvelope{
 		SessionID: "abc", ProjectDir: "-tmp",
-		FileMTime: now, LineIndex: 2,
+		FileMTime: eventTime, LineIndex: 2,
 		Raw: mustRaw(t, map[string]any{
 			"type":      "user",
-			"timestamp": now,
+			"timestamp": eventTime,
 			"message": map[string]any{
 				"role": "user",
 				"content": []any{
@@ -128,25 +129,38 @@ func TestApply_ToolResult_ClearsPending(t *testing.T) {
 	if got.Status == StatusWorking {
 		t.Errorf("Status should not still be working after last tool_result cleared")
 	}
+	if got.Status != StatusDone {
+		t.Errorf("Status = %q, want done after pending cleared", got.Status)
+	}
 }
 
-func TestRecomputeStatus_IdleAfter30s(t *testing.T) {
+func TestRecomputeStatus_DoneAfter2sNoPending(t *testing.T) {
 	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
 	s := &Session{
-		Status:            StatusWaitingInput,
-		LastEventAt:       now.Add(-31 * time.Second),
+		LastEventAt:       now.Add(-3 * time.Second),
 		PendingToolUseIDs: map[string]struct{}{},
 	}
 	RecomputeStatus(s, now)
-	if s.Status != StatusIdle {
-		t.Errorf("Status = %q, want idle", s.Status)
+	if s.Status != StatusDone {
+		t.Errorf("Status = %q, want done", s.Status)
+	}
+}
+
+func TestRecomputeStatus_WorkingDebounceUnder2s(t *testing.T) {
+	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
+	s := &Session{
+		LastEventAt:       now.Add(-1 * time.Second),
+		PendingToolUseIDs: map[string]struct{}{},
+	}
+	RecomputeStatus(s, now)
+	if s.Status != StatusWorking {
+		t.Errorf("Status = %q, want working (within 2-s debounce)", s.Status)
 	}
 }
 
 func TestRecomputeStatus_StaleAfter1h(t *testing.T) {
 	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
 	s := &Session{
-		Status:            StatusIdle,
 		LastEventAt:       now.Add(-2 * time.Hour),
 		PendingToolUseIDs: map[string]struct{}{},
 	}
