@@ -4,9 +4,9 @@ import "testing"
 
 func TestDecodeProjectDir(t *testing.T) {
 	cases := map[string]string{
-		"-Users-lucasbacelo-Projects-supervAIsor": "/Users/lucasbacelo/Projects/supervAIsor",
-		"-tmp-foo":                                "/tmp/foo",
-		"":                                        "",
+		"-Users-you-Projects-supervAIsor": "/Users/you/Projects/supervAIsor",
+		"-tmp-foo":                        "/tmp/foo",
+		"":                                "",
 	}
 	for in, want := range cases {
 		got := DecodeProjectDir(in)
@@ -18,8 +18,8 @@ func TestDecodeProjectDir(t *testing.T) {
 
 func TestDecodeProjectDir_AbsolutePathPassthrough(t *testing.T) {
 	cases := map[string]string{
-		"/Users/lucasbacelo/Projects/ai-dream-team": "/Users/lucasbacelo/Projects/ai-dream-team",
-		"/Users/lucasbacelo/Projects":               "/Users/lucasbacelo/Projects",
+		"/Users/you/Projects/ai-dream-team": "/Users/you/Projects/ai-dream-team",
+		"/Users/you/Projects":               "/Users/you/Projects",
 	}
 	for in, want := range cases {
 		got := DecodeProjectDir(in)

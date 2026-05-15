@@ -131,7 +131,7 @@ func TestApply_ToolResultSuccess_PreservesLastErrorAt(t *testing.T) {
 - [ ] **Step 1.2: Run tests to verify they fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/state/ -run 'TestApply_ToolResult(Error|Success)' -v
+cd <repo>/backend && go test ./internal/state/ -run 'TestApply_ToolResult(Error|Success)' -v
 ```
 Expected: compile error — `LastErrorAt` undefined on `Session`.
 
@@ -214,21 +214,21 @@ and replace with:
 - [ ] **Step 1.6: Run tests to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/state/ -v
+cd <repo>/backend && go test ./internal/state/ -v
 ```
 Expected: PASS for everything in the package.
 
 - [ ] **Step 1.7: Run the whole backend suite**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./...
+cd <repo>/backend && go test ./...
 ```
 Expected: PASS.
 
 - [ ] **Step 1.8: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/state/session.go backend/internal/state/derive.go backend/internal/state/derive_test.go
 git commit -m "feat(state): track LastErrorAt from tool_result.is_error"
 ```
@@ -311,7 +311,7 @@ If `time` and `context` aren't already imported, add them.
 - [ ] **Step 2.2: Run tests to verify they fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/store/ -run TestUpsertSession_.*LastErrorAt -v
+cd <repo>/backend && go test ./internal/store/ -run TestUpsertSession_.*LastErrorAt -v
 ```
 Expected: FAIL — column doesn't exist or is not stored/loaded.
 
@@ -480,14 +480,14 @@ FROM sessions WHERE hostname = ? AND id = ?`, hostname, id)
 - [ ] **Step 2.6: Run tests to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./...
+cd <repo>/backend && go test ./...
 ```
 Expected: PASS, including the two new round-trip tests.
 
 - [ ] **Step 2.7: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/store/sqlite.go backend/internal/store/sqlite_test.go
 git commit -m "feat(store): persist last_error_at on sessions; migrate older DBs additively"
 ```
@@ -521,14 +521,14 @@ export interface Session {
 - [ ] **Step 3.2: Type-check**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx tsc --noEmit
+cd <repo>/frontend && npx tsc --noEmit
 ```
 Expected: PASS (additive optional field).
 
 - [ ] **Step 3.3: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/types.ts
 git commit -m "feat(types): expose last_error_at on Session"
 ```
@@ -600,7 +600,7 @@ describe("pins storage", () => {
 - [ ] **Step 4.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/pins.test.ts
+cd <repo>/frontend && npx vitest run src/lib/pins.test.ts
 ```
 Expected: FAIL — module not found.
 
@@ -655,14 +655,14 @@ export function subscribe(fn: Listener): () => void {
 - [ ] **Step 4.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/pins.test.ts
+cd <repo>/frontend && npx vitest run src/lib/pins.test.ts
 ```
 Expected: PASS for all five cases.
 
 - [ ] **Step 4.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/lib/pins.ts frontend/src/lib/pins.test.ts
 git commit -m "feat(lib): pins storage with subscribe helper"
 ```
@@ -733,7 +733,7 @@ describe("partitionAndSort", () => {
 - [ ] **Step 5.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/sort.test.ts
+cd <repo>/frontend && npx vitest run src/lib/sort.test.ts
 ```
 Expected: FAIL — module not found.
 
@@ -797,14 +797,14 @@ export function partitionAndSort(
 - [ ] **Step 5.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/sort.test.ts
+cd <repo>/frontend && npx vitest run src/lib/sort.test.ts
 ```
 Expected: PASS for all six cases.
 
 - [ ] **Step 5.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/lib/sort.ts frontend/src/lib/sort.test.ts
 git commit -m "feat(lib): partitionAndSort for pinned-first session ordering"
 ```
@@ -953,7 +953,7 @@ describe("useErrorFlash", () => {
 - [ ] **Step 6.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/notify.test.ts
+cd <repo>/frontend && npx vitest run src/lib/notify.test.ts
 ```
 Expected: FAIL — module not found.
 
@@ -1116,14 +1116,14 @@ export function useErrorFlash(sessions: readonly Session[]): ErrorFlashState {
 - [ ] **Step 6.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/notify.test.ts
+cd <repo>/frontend && npx vitest run src/lib/notify.test.ts
 ```
 Expected: PASS.
 
 - [ ] **Step 6.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/lib/notify.ts frontend/src/lib/notify.test.ts
 git commit -m "feat(lib): notify storage, turn-completion + error-flash hooks, WebAudio beep"
 ```
@@ -1162,7 +1162,7 @@ Add at the end of `frontend/src/index.css`:
 - [ ] **Step 7.2: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/index.css
 git commit -m "feat(ui): keyframes for flash-complete (yellow→cyan) and flash-error (red)"
 ```
@@ -1272,14 +1272,14 @@ export function HeaderControls({
 - [ ] **Step 8.2: Type-check**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx tsc --noEmit
+cd <repo>/frontend && npx tsc --noEmit
 ```
 Expected: FAIL — `App.tsx` doesn't supply `sort`/`onSortChange` yet. That gets fixed in Task 11. Continue.
 
 - [ ] **Step 8.3: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/components/HeaderControls.tsx
 git commit -m "feat(ui): SORT dropdown in HeaderControls"
 ```
@@ -1368,7 +1368,7 @@ describe("SessionCard", () => {
 - [ ] **Step 9.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/components/SessionCard.test.tsx
+cd <repo>/frontend && npx vitest run src/components/SessionCard.test.tsx
 ```
 Expected: FAIL on the four new cases.
 
@@ -1483,14 +1483,14 @@ export function SessionCard({
 - [ ] **Step 9.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/components/SessionCard.test.tsx
+cd <repo>/frontend && npx vitest run src/components/SessionCard.test.tsx
 ```
 Expected: PASS for all six cases.
 
 - [ ] **Step 9.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/components/SessionCard.tsx frontend/src/components/SessionCard.test.tsx
 git commit -m "feat(ui): pin/notify icons, flash classes, and error border on SessionCard"
 ```
@@ -1552,7 +1552,7 @@ it("toggles notify via the SETTINGS switch and persists to storage", async () =>
 - [ ] **Step 10.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/components/SessionDetails.test.tsx
+cd <repo>/frontend && npx vitest run src/components/SessionDetails.test.tsx
 ```
 Expected: FAIL — no `switch` role found.
 
@@ -1638,14 +1638,14 @@ function SwitchRow({
 - [ ] **Step 10.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/components/SessionDetails.test.tsx
+cd <repo>/frontend && npx vitest run src/components/SessionDetails.test.tsx
 ```
 Expected: PASS for the new pin + notify cases (and existing two cases).
 
 - [ ] **Step 10.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/components/SessionDetails.tsx frontend/src/components/SessionDetails.test.tsx
 git commit -m "feat(ui): SETTINGS section in SessionDetails with pin and notify switches"
 ```
@@ -1876,21 +1876,21 @@ export default function App() {
 - [ ] **Step 11.2: Type-check**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx tsc --noEmit
+cd <repo>/frontend && npx tsc --noEmit
 ```
 Expected: PASS.
 
 - [ ] **Step 11.3: Run the full frontend suite**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run
+cd <repo>/frontend && npx vitest run
 ```
 Expected: PASS — all suites including the new pin/notify/sort/flash coverage.
 
 - [ ] **Step 11.4: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/App.tsx
 git commit -m "feat(ui): wire sort/pin/notify/counters and turn-complete + error flashes"
 ```
@@ -1904,7 +1904,7 @@ git commit -m "feat(ui): wire sort/pin/notify/counters and turn-complete + error
 - [ ] **Step 12.1: Build everything**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor && make test
+cd <repo> && make test
 ```
 Expected: backend, poller, and frontend tests all PASS.
 

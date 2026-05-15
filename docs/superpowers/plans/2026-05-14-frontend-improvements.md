@@ -261,8 +261,8 @@ Append to `backend/internal/state/projectdir_test.go` inside the existing test t
 ```go
 func TestDecodeProjectDir_AbsolutePathPassthrough(t *testing.T) {
 	cases := map[string]string{
-		"/Users/lucasbacelo/Projects/ai-dream-team": "/Users/lucasbacelo/Projects/ai-dream-team",
-		"/Users/lucasbacelo/Projects":               "/Users/lucasbacelo/Projects",
+		"/Users/you/Projects/ai-dream-team": "/Users/you/Projects/ai-dream-team",
+		"/Users/you/Projects":               "/Users/you/Projects",
 	}
 	for in, want := range cases {
 		got := DecodeProjectDir(in)
@@ -289,7 +289,7 @@ import "strings"
 
 // DecodeProjectDir converts Claude's encoded project dir name back into
 // a real filesystem path. Claude encodes paths by replacing every "/"
-// with "-" (e.g. "-Users-lucasbacelo-foo" -> "/Users/lucasbacelo/foo").
+// with "-" (e.g. "-Users-you-foo" -> "/Users/you/foo").
 //
 // If the input already starts with "/" the poller has already resolved
 // the real path against the host filesystem (the only place that can

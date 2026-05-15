@@ -67,7 +67,7 @@ The Claude Code session files live on the host at `~/.claude/projects/`. Mountin
 ```json
 {
   "session_id": "54f9076d-0048-4b52-aa47-7f4c55832c28",
-  "project_dir": "-Users-lucasbacelo-Projects-supervAIsor",
+  "project_dir": "-Users-you-Projects-supervAIsor",
   "file_mtime": "2026-05-14T01:13:22Z",
   "line_index": 57,
   "raw": { /* the original JSONL line, parsed */ }
@@ -102,7 +102,7 @@ The backend keeps a `Session` in-memory and persists every change.
 | Field | Derivation |
 |---|---|
 | `session_id` | from filename |
-| `project` | decoded directory name; the dir name format is path with `/` replaced by `-`. Decoding restores `/Users/lucasbacelo/Projects/supervAIsor` |
+| `project` | decoded directory name; the dir name format is path with `/` replaced by `-`. Decoding restores `<repo>` |
 | `name` | latest `custom-title.customTitle` else latest `agent-name.agentName` else first 8 chars of `session_id` |
 | `started_at` | timestamp of the first event in the file, or file ctime if no timestamp |
 | `last_event_at` | timestamp of the most recent event |

@@ -70,7 +70,7 @@ No flags, no env vars. The poller reads every setting from `~/.supervaisor/setti
 }
 ```
 
-`backend` is `host[:port][/path]` (no scheme). The poller prepends `ws://` and appends `/ws/ingest`. Examples: `localhost:8080` → `ws://localhost:8080/ws/ingest`, `mmm4p.local/supervaisor` → `ws://mmm4p.local/supervaisor/ws/ingest`.
+`backend` is `host[:port][/path]` (no scheme). The poller prepends `ws://` and appends `/ws/ingest`. Examples: `localhost:8080` → `ws://localhost:8080/ws/ingest`, `dashboard.local/supervaisor` → `ws://dashboard.local/supervaisor/ws/ingest`.
 
 `-hostname` defaults to the OS hostname with a trailing `.local` stripped (macOS-friendly). Multiple pollers on different machines can target the same backend concurrently.
 
