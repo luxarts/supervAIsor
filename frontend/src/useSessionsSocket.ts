@@ -4,11 +4,13 @@ import type { Session, Frame } from "./types";
 export interface SocketState {
   sessions: Session[];
   connected: boolean;
+  pollersOnline: Record<string, boolean>;
 }
 
 export function useSessionsSocket(url: string): SocketState {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [connected, setConnected] = useState(false);
+  const [pollersOnline, setPollersOnline] = useState<Record<string, boolean>>({});
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<number>(0);
 
@@ -44,6 +46,12 @@ export function useSessionsSocket(url: string): SocketState {
             setSessions((prev) =>
               prev.filter((s) => !(s.id === frame.session_id && s.hostname === frame.hostname)),
             );
+          } else if (frame.kind === "pollers") {
+            setPollersOnline(frame.online);
+          } else if (frame.kind === "session_removed") {
+            setSessions((prev) =>
+              prev.filter((s) => !(s.id === frame.id && s.hostname === frame.hostname)),
+            );
           }
         } catch {
           // ignore malformed frames
@@ -69,5 +77,5 @@ export function useSessionsSocket(url: string): SocketState {
     };
   }, [url]);
 
-  return { sessions, connected };
+  return { sessions, connected, pollersOnline };
 }

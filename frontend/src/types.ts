@@ -11,9 +11,12 @@ export interface Session {
   current_action: string;
   last_event_at: string;
   last_error_at?: string;
+  project_dir_encoded?: string;
 }
 
 export type Frame =
   | { kind: "snapshot"; sessions: Session[] }
   | { kind: "update"; session: Session }
-  | { kind: "delete"; session_id: string; hostname: string };
+  | { kind: "delete"; session_id: string; hostname: string }
+  | { kind: "pollers"; online: Record<string, boolean> }
+  | { kind: "session_removed"; hostname: string; id: string };
