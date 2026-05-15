@@ -10,6 +10,7 @@ export interface Session {
   last_prompt_at?: string;
   current_action: string;
   last_event_at: string;
+  last_error_at?: string;
 }
 
 export type Frame =
