@@ -125,12 +125,11 @@ func TestApply_ToolResult_ClearsPending(t *testing.T) {
 	if _, ok := got.PendingToolUseIDs["tool_1"]; ok {
 		t.Errorf("tool_1 should have been cleared")
 	}
-	// Status would be re-derived to working only if there are still pending IDs.
-	if got.Status == StatusWorking {
-		t.Errorf("Status should not still be working after last tool_result cleared")
-	}
-	if got.Status != StatusDone {
-		t.Errorf("Status = %q, want done after pending cleared", got.Status)
+	// After clearing the last pending tool_use, Apply re-derives via
+	// RecomputeStatus with age=0, which falls inside the 2-s WORKING
+	// debounce. The runStatusTicker will flip it to DONE later.
+	if got.Status != StatusWorking {
+		t.Errorf("Status = %q, want working (debounce window)", got.Status)
 	}
 }
 

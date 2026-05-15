@@ -66,11 +66,7 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 		applyUser(&next, line)
 	}
 
-	if len(next.PendingToolUseIDs) > 0 {
-		next.Status = StatusWorking
-	} else {
-		next.Status = StatusDone
-	}
+	RecomputeStatus(&next, ts)
 	return &next, nil
 }
 
