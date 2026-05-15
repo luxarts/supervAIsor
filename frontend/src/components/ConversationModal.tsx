@@ -55,6 +55,7 @@ export function ConversationModal({
   useEffect(() => {
     setEvents(null);
     setError(null);
+    setTab("conversation");
   }, [sessionId, hostname]);
 
   // Refetch on mount, on session change, and whenever the underlying session
@@ -81,10 +82,10 @@ export function ConversationModal({
   }, [sessionId, hostname, lastEventAt, backendHttpBase]);
 
   useEffect(() => {
-    if (events && bodyRef.current) {
+    if (tab === "conversation" && events && bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
-  }, [events]);
+  }, [events, tab]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
