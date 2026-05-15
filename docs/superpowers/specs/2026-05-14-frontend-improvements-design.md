@@ -24,7 +24,7 @@ All four must work comfortably on a touchscreen (≥44 px touch targets, swipe g
 
 ### Project path resolution (root-cause fix)
 
-Today: `poller` sends Claude's encoded project dir (e.g. `-Users-lucasbacelo-Projects-ai-dream-team`); `backend/internal/state/projectdir.go` naively replaces every `-` with `/`, producing the wrong path `/Users/lucasbacelo/Projects/ai/dream/team` whenever the project name contains a dash.
+Today: `poller` sends Claude's encoded project dir (e.g. `-Users-you-Projects-ai-dream-team`); `backend/internal/state/projectdir.go` naively replaces every `-` with `/`, producing the wrong path `/Users/you/Projects/ai/dream/team` whenever the project name contains a dash.
 
 The encoded form is ambiguous in isolation. Disambiguation requires checking which path actually exists on disk. The backend runs in a Docker container without host filesystem access, so resolution must happen in the poller (host-native).
 

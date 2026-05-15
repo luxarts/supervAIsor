@@ -16,16 +16,16 @@ func TestResolveBackendURL_HostPort(t *testing.T) {
 }
 
 func TestResolveBackendURL_HostWithPath(t *testing.T) {
-	got := resolveBackendURL(Config{Backend: "mmm4p.local/supervaisor"})
-	want := "ws://mmm4p.local/supervaisor/ws/ingest"
+	got := resolveBackendURL(Config{Backend: "dashboard.local/supervaisor"})
+	want := "ws://dashboard.local/supervaisor/ws/ingest"
 	if got != want {
 		t.Errorf("got %q want %q", got, want)
 	}
 }
 
 func TestResolveBackendURL_TrailingSlashTolerated(t *testing.T) {
-	got := resolveBackendURL(Config{Backend: "mmm4p.local/supervaisor/"})
-	want := "ws://mmm4p.local/supervaisor/ws/ingest"
+	got := resolveBackendURL(Config{Backend: "dashboard.local/supervaisor/"})
+	want := "ws://dashboard.local/supervaisor/ws/ingest"
 	if got != want {
 		t.Errorf("got %q want %q", got, want)
 	}
@@ -75,7 +75,7 @@ func TestLoadConfig_ReadsExistingFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := `{
-	  "backend": "mmm4p.local/supervaisor",
+	  "backend": "dashboard.local/supervaisor",
 	  "hostname": "from-file",
 	  "interval": "500ms"
 	}`
@@ -86,7 +86,7 @@ func TestLoadConfig_ReadsExistingFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Backend != "mmm4p.local/supervaisor" || c.Hostname != "from-file" {
+	if c.Backend != "dashboard.local/supervaisor" || c.Hostname != "from-file" {
 		t.Errorf("file not applied: %#v", c)
 	}
 	if c.Interval != 500*time.Millisecond {

@@ -120,7 +120,7 @@ func TestDeleteSession_NoOpOnMissing(t *testing.T) {
 - [ ] **Step 1.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/store/ -run TestDeleteSession -v
+cd <repo>/backend && go test ./internal/store/ -run TestDeleteSession -v
 ```
 Expected: FAIL — method undefined.
 
@@ -151,14 +151,14 @@ func (s *SQLite) DeleteSession(ctx context.Context, hostname, id string) error {
 - [ ] **Step 1.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/store/ -v
+cd <repo>/backend && go test ./internal/store/ -v
 ```
 Expected: PASS.
 
 - [ ] **Step 1.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/store/sqlite.go backend/internal/store/sqlite_test.go
 git commit -m "feat(store): DeleteSession purges session row + all events transactionally"
 ```
@@ -289,7 +289,7 @@ func TestRegistry_SubscribeReceivesTransitions(t *testing.T) {
 - [ ] **Step 2.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/ingest/ -run TestRegistry -v
+cd <repo>/backend && go test ./internal/ingest/ -run TestRegistry -v
 ```
 Expected: FAIL — types undefined.
 
@@ -425,14 +425,14 @@ func (r *Registry) notify(snap map[string]bool) {
 - [ ] **Step 2.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/ingest/ -run TestRegistry -v
+cd <repo>/backend && go test ./internal/ingest/ -run TestRegistry -v
 ```
 Expected: PASS.
 
 - [ ] **Step 2.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/ingest/registry.go backend/internal/ingest/registry_test.go
 git commit -m "feat(ingest): Registry tracks per-host poller writer channels with subscribe"
 ```
@@ -520,7 +520,7 @@ func TestCoordinator_ResolveUnknownIsNoop(t *testing.T) {
 - [ ] **Step 3.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/ingest/ -run TestCoordinator -v
+cd <repo>/backend && go test ./internal/ingest/ -run TestCoordinator -v
 ```
 Expected: FAIL — undefined.
 
@@ -629,14 +629,14 @@ func (c *DeleteCoordinator) Close() {
 - [ ] **Step 3.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/ingest/ -run TestCoordinator -v
+cd <repo>/backend && go test ./internal/ingest/ -run TestCoordinator -v
 ```
 Expected: PASS for all 5 cases.
 
 - [ ] **Step 3.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/ingest/coordinator.go backend/internal/ingest/coordinator_test.go
 git commit -m "feat(ingest): DeleteCoordinator correlates delete commands with acks; 10s timeout"
 ```
@@ -700,7 +700,7 @@ func TestApply_PropagatesProjectDirEncoded(t *testing.T) {
 - [ ] **Step 4.4: Run state tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/state/ -v
+cd <repo>/backend && go test ./internal/state/ -v
 ```
 Expected: PASS.
 
@@ -876,14 +876,14 @@ func TestUpsertSession_RoundTripsProjectDirEncoded(t *testing.T) {
 - [ ] **Step 4.7: Run all backend tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./...
+cd <repo>/backend && go test ./...
 ```
 Expected: PASS.
 
 - [ ] **Step 4.8: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/state/session.go backend/internal/state/derive.go backend/internal/state/derive_test.go backend/internal/store/sqlite.go backend/internal/store/sqlite_test.go
 git commit -m "feat(state,store): persist ProjectDirEncoded for session deletion path"
 ```
@@ -918,7 +918,7 @@ func TestComputeStats_IncludesProjectDirEncoded(t *testing.T) {
 - [ ] **Step 5.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/state/ -run TestComputeStats_IncludesProjectDirEncoded -v
+cd <repo>/backend && go test ./internal/state/ -run TestComputeStats_IncludesProjectDirEncoded -v
 ```
 Expected: FAIL — field not present.
 
@@ -949,14 +949,14 @@ In `ComputeStats`, copy from the session:
 - [ ] **Step 5.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/state/ -v
+cd <repo>/backend && go test ./internal/state/ -v
 ```
 Expected: PASS.
 
 - [ ] **Step 5.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/state/stats.go backend/internal/state/stats_test.go
 git commit -m "feat(stats): include project_dir_encoded in /stats response"
 ```
@@ -1133,7 +1133,7 @@ func peekType(raw json.RawMessage) string {
 The existing `handler_test.go::TestIngest_PersistsAndBroadcasts` constructs `&Handler{Store: db, Hub: hub}`. The new fields are optional; the handler must continue to work with them nil. Verify by running:
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/ingest/ -run TestIngest -v
+cd <repo>/backend && go test ./internal/ingest/ -run TestIngest -v
 ```
 Expected: PASS (no changes needed because the new fields default to nil and the handler skips registry/coordinator interactions when they are).
 
@@ -1189,14 +1189,14 @@ func TestIngest_DeleteAckRoutesToCoordinator(t *testing.T) {
 - [ ] **Step 6.4: Run handler tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/ingest/ -v
+cd <repo>/backend && go test ./internal/ingest/ -v
 ```
 Expected: PASS for all ingest tests.
 
 - [ ] **Step 6.5: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/ingest/handler.go backend/internal/ingest/handler_test.go
 git commit -m "feat(ingest): bidirectional handler — register conn, dispatch delete_ack"
 ```
@@ -1234,7 +1234,7 @@ func TestForget_RemovesEntry(t *testing.T) {
 - [ ] **Step 7.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/poller && go test ./internal/offsets/ -run TestForget -v
+cd <repo>/poller && go test ./internal/offsets/ -run TestForget -v
 ```
 Expected: FAIL — method undefined.
 
@@ -1255,7 +1255,7 @@ func (s *Store) Forget(file string) {
 - [ ] **Step 7.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/poller && go test ./internal/offsets/ -v
+cd <repo>/poller && go test ./internal/offsets/ -v
 ```
 Expected: PASS.
 
@@ -1332,7 +1332,7 @@ func TestDeleter_RefusesPathEscape(t *testing.T) {
 - [ ] **Step 7.6: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/poller && go test ./internal/deleter/ -v
+cd <repo>/poller && go test ./internal/deleter/ -v
 ```
 Expected: FAIL — package not found.
 
@@ -1393,14 +1393,14 @@ func (d *Deleter) Delete(_ context.Context, sessionID, projectDir string) error 
 - [ ] **Step 7.8: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/poller && go test ./...
+cd <repo>/poller && go test ./...
 ```
 Expected: PASS.
 
 - [ ] **Step 7.9: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add poller/internal/offsets/offsets.go poller/internal/offsets/offsets_test.go poller/internal/deleter/deleter.go poller/internal/deleter/deleter_test.go
 git commit -m "feat(poller): Deleter removes JSONL + prunes offset; offsets.Forget helper"
 ```
@@ -1467,7 +1467,7 @@ func TestRun_DispatchesDeleteCommand(t *testing.T) {
 - [ ] **Step 8.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/poller && go test ./internal/wsclient/ -run TestRun -v
+cd <repo>/poller && go test ./internal/wsclient/ -run TestRun -v
 ```
 Expected: FAIL — `Run` and `OnCommand` undefined.
 
@@ -1621,7 +1621,7 @@ func (c *Client) Run(stop <-chan struct{}) {
 - [ ] **Step 8.4: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/poller && go test ./internal/wsclient/ -v
+cd <repo>/poller && go test ./internal/wsclient/ -v
 ```
 Expected: PASS.
 
@@ -1654,14 +1654,14 @@ After the `cli := wsclient.New(url)` line, add:
 - [ ] **Step 8.6: Build the poller**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/poller && go build ./...
+cd <repo>/poller && go build ./...
 ```
 Expected: builds cleanly.
 
 - [ ] **Step 8.7: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add poller/internal/wsclient/client.go poller/internal/wsclient/client_test.go poller/cmd/poller/main.go
 git commit -m "feat(poller): wsclient.Run dispatches delete commands; main wires Deleter"
 ```
@@ -1862,7 +1862,7 @@ The test imports `ingest`, `broadcast`, `json`, `time` — make sure those are p
 - [ ] **Step 9.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/api/ -run TestDeleteSession -v
+cd <repo>/backend && go test ./internal/api/ -run TestDeleteSession -v
 ```
 Expected: FAIL — `Sender`/`Coordinator`/`Hub` fields missing on `Handler`; `DELETE` not registered.
 
@@ -2013,21 +2013,21 @@ func (h *Handler) deleteSession(c *gin.Context) {
 - [ ] **Step 9.4: Run tests to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/api/ -v
+cd <repo>/backend && go test ./internal/api/ -v
 ```
 Expected: PASS for the four new `TestDeleteSession_*` cases plus all existing.
 
 - [ ] **Step 9.5: Run all backend tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./...
+cd <repo>/backend && go test ./...
 ```
 Expected: PASS.
 
 - [ ] **Step 9.6: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/api/sessions.go backend/internal/api/sessions_test.go
 git commit -m "feat(api): DELETE /sessions/:hostname/:id with poller-online gate and ack wait"
 ```
@@ -2133,7 +2133,7 @@ func (s *staticSnapshotWithPollers) PollersOnline() map[string]bool { return s.p
 - [ ] **Step 10.4: Run broadcast tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./internal/broadcast/ -v
+cd <repo>/backend && go test ./internal/broadcast/ -v
 ```
 Expected: PASS.
 
@@ -2283,21 +2283,21 @@ func envDefault(k, def string) string {
 - [ ] **Step 10.6: Build the backend**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go build ./...
+cd <repo>/backend && go build ./...
 ```
 Expected: builds cleanly.
 
 - [ ] **Step 10.7: Run all backend tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/backend && go test ./...
+cd <repo>/backend && go test ./...
 ```
 Expected: PASS.
 
 - [ ] **Step 10.8: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add backend/internal/broadcast/handler.go backend/internal/broadcast/handler_test.go backend/cmd/server/main.go
 git commit -m "feat(server): instantiate registry+coordinator; broadcast pollers liveness"
 ```
@@ -2410,7 +2410,7 @@ describe("useSessionsSocket", () => {
 - [ ] **Step 11.3: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/useSessionsSocket.test.ts
+cd <repo>/frontend && npx vitest run src/useSessionsSocket.test.ts
 ```
 Expected: FAIL — `pollersOnline` undefined.
 
@@ -2505,21 +2505,21 @@ export function useSessionsSocket(url: string): SocketState {
 - [ ] **Step 11.5: Run to verify pass**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/useSessionsSocket.test.ts
+cd <repo>/frontend && npx vitest run src/useSessionsSocket.test.ts
 ```
 Expected: PASS.
 
 - [ ] **Step 11.6: Type-check (App still expects only `sessions`/`connected`; this is fine since we add a non-breaking field)**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx tsc --noEmit
+cd <repo>/frontend && npx tsc --noEmit
 ```
 Expected: PASS.
 
 - [ ] **Step 11.7: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/types.ts frontend/src/useSessionsSocket.ts frontend/src/useSessionsSocket.test.ts
 git commit -m "feat(ui): useSessionsSocket parses pollers + session_removed frames"
 ```
@@ -2559,7 +2559,7 @@ it("renders a red LED when pollerOnline is false", () => {
 - [ ] **Step 12.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/components/SessionCard.test.tsx
+cd <repo>/frontend && npx vitest run src/components/SessionCard.test.tsx
 ```
 Expected: FAIL on the two new cases.
 
@@ -2640,14 +2640,14 @@ Add `pollerOnline={pollersOnline[s.hostname] ?? false}` to the `<SessionCard>` m
 - [ ] **Step 12.5: Run tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run && npx tsc --noEmit
+cd <repo>/frontend && npx vitest run && npx tsc --noEmit
 ```
 Expected: PASS, clean.
 
 - [ ] **Step 12.6: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/components/SessionCard.tsx frontend/src/components/SessionCard.test.tsx frontend/src/App.tsx
 git commit -m "feat(ui): poller-online LED on SessionCard + App wiring"
 ```
@@ -2706,7 +2706,7 @@ describe("deleteSession", () => {
 - [ ] **Step 13.2: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/deleteSession.test.ts
+cd <repo>/frontend && npx vitest run src/lib/deleteSession.test.ts
 ```
 Expected: FAIL — module not found.
 
@@ -2742,7 +2742,7 @@ export async function deleteSession(
 - [ ] **Step 13.4: Run wrapper tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/lib/deleteSession.test.ts
+cd <repo>/frontend && npx vitest run src/lib/deleteSession.test.ts
 ```
 Expected: PASS.
 
@@ -2802,7 +2802,7 @@ it("requires two clicks to delete and calls onDeleted on 204", async () => {
 - [ ] **Step 13.6: Run to verify fail**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx vitest run src/components/SessionDetails.test.tsx
+cd <repo>/frontend && npx vitest run src/components/SessionDetails.test.tsx
 ```
 Expected: FAIL — DELETE button not present.
 
@@ -2986,14 +2986,14 @@ Edit `frontend/src/App.tsx`. Around the existing `<ConversationModal>` element, 
 - [ ] **Step 13.10: Run all frontend tests**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend && npx tsc --noEmit && npx vitest run
+cd <repo>/frontend && npx tsc --noEmit && npx vitest run
 ```
 Expected: PASS.
 
 - [ ] **Step 13.11: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/src/lib/deleteSession.ts frontend/src/lib/deleteSession.test.ts frontend/src/components/SessionDetails.tsx frontend/src/components/SessionDetails.test.tsx frontend/src/components/ConversationModal.tsx frontend/src/App.tsx
 git commit -m "feat(ui): DANGER ZONE in SessionDetails — two-click delete gated by poller LED"
 ```
@@ -3018,7 +3018,7 @@ Update the bullet describing the backend's endpoints to include `DELETE /session
 - [ ] **Step 14.2: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add CLAUDE.md
 git commit -m "docs: note user-initiated deletion in CLAUDE.md overview"
 ```
@@ -3032,7 +3032,7 @@ git commit -m "docs: note user-initiated deletion in CLAUDE.md overview"
 - [ ] **Step 15.1: Build everything**
 
 ```
-cd /Users/lucasbacelo/Projects/supervAIsor && make test
+cd <repo> && make test
 ```
 Expected: backend, poller, and frontend tests all PASS.
 

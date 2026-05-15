@@ -653,14 +653,14 @@ package hostname
 import "testing"
 
 func TestClean_StripsDotLocal(t *testing.T) {
-    if got := Clean("lucas-mbp.local"); got != "lucas-mbp" {
-        t.Errorf("Clean = %q, want lucas-mbp", got)
+    if got := Clean("my-mbp.local"); got != "my-mbp" {
+        t.Errorf("Clean = %q, want my-mbp", got)
     }
 }
 
 func TestClean_LeavesOthersAlone(t *testing.T) {
-    if got := Clean("lucas-mbp"); got != "lucas-mbp" {
-        t.Errorf("Clean = %q, want lucas-mbp", got)
+    if got := Clean("my-mbp"); got != "my-mbp" {
+        t.Errorf("Clean = %q, want my-mbp", got)
     }
     if got := Clean("server.example.com"); got != "server.example.com" {
         t.Errorf("Clean = %q, want server.example.com", got)
@@ -689,8 +689,8 @@ Create `poller/internal/hostname/hostname.go`:
 
 ```go
 // Package hostname resolves the local machine's hostname and applies macOS
-// cleanup (strip trailing ".local") so cards read e.g. "lucas-mbp" not
-// "lucas-mbp.local".
+// cleanup (strip trailing ".local") so cards read e.g. "my-mbp" not
+// "my-mbp.local".
 package hostname
 
 import (

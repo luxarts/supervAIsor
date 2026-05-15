@@ -118,7 +118,7 @@ Replace the single `-backend` URL with host+port pieces, keeping `-backend` as a
 
 If `-backend` is empty, the poller builds `ws://{backend-host}:{backend-port}/ws/ingest`.
 
-**Hostname resolution (macOS):** call `os.Hostname()`; strip a trailing `.local` suffix if present so cards read `lucas-mbp` instead of `lucas-mbp.local`. If the call fails or returns empty, abort startup with a clear error (hostname is required).
+**Hostname resolution (macOS):** call `os.Hostname()`; strip a trailing `.local` suffix if present so cards read `my-mbp` instead of `my-mbp.local`. If the call fails or returns empty, abort startup with a clear error (hostname is required).
 
 ### Envelope construction
 

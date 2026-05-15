@@ -21,7 +21,7 @@ import (
 // resolveBackendURL turns the user-facing "host:port/path" form into a full
 // WS URL. The scheme is fixed (ws://) and "/ws/ingest" is appended if the
 // configured value doesn't already end with it, so both "localhost:8080" and
-// "mmm4p.local/supervaisor" yield the right endpoint.
+// "dashboard.local/supervaisor" yield the right endpoint.
 func resolveBackendURL(c Config) string {
 	b := strings.TrimSuffix(c.Backend, "/")
 	if !strings.HasSuffix(b, "/ws/ingest") {

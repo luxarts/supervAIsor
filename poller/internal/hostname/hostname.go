@@ -1,6 +1,6 @@
 // Package hostname resolves the local machine's hostname and applies macOS
-// cleanup (strip trailing ".local") so cards read e.g. "lucas-mbp" not
-// "lucas-mbp.local".
+// cleanup (strip trailing ".local") so cards read e.g. "my-mbp" not
+// "my-mbp.local".
 package hostname
 
 import (

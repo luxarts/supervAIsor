@@ -92,7 +92,7 @@
 - [ ] **Step 1: Delete the obsolete packages and files**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor/backend
+cd <repo>/backend
 rm -rf internal/agent internal/hooks internal/ws
 rm -f internal/state/store.go internal/api/handler.go
 ```
@@ -152,7 +152,7 @@ Expected: build succeeds with no errors. `go.sum` may shrink.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add -A backend/
 git commit -m "refactor(backend): remove legacy agent/hooks/ws packages"
 ```
@@ -167,7 +167,7 @@ git commit -m "refactor(backend): remove legacy agent/hooks/ws packages"
 - [ ] **Step 1: Add SQLite (pure Go) + fsnotify-free deps**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor/backend
+cd <repo>/backend
 go get modernc.org/sqlite@latest
 go get github.com/stretchr/testify@latest
 go mod tidy
@@ -304,7 +304,7 @@ import "testing"
 
 func TestDecodeProjectDir(t *testing.T) {
 	cases := map[string]string{
-		"-Users-lucasbacelo-Projects-supervAIsor": "/Users/lucasbacelo/Projects/supervAIsor",
+		"-Users-you-Projects-supervAIsor": "<repo>",
 		"-tmp-foo":                                "/tmp/foo",
 		"":                                        "",
 	}
@@ -331,7 +331,7 @@ import "strings"
 
 // DecodeProjectDir converts Claude's encoded project dir name back into
 // a real filesystem path. Claude replaces every "/" in the absolute path
-// with "-". e.g. "-Users-lucasbacelo-foo" -> "/Users/lucasbacelo/foo".
+// with "-". e.g. "-Users-you-foo" -> "/Users/you/foo".
 func DecodeProjectDir(s string) string {
 	if s == "" {
 		return ""
@@ -1850,8 +1850,8 @@ git commit -m "feat(backend): wire ingest/clients WS, REST, status ticker in mai
 - [ ] **Step 1: Initialize module**
 
 ```bash
-mkdir -p /Users/lucasbacelo/Projects/supervAIsor/poller/cmd/poller
-cd /Users/lucasbacelo/Projects/supervAIsor/poller
+mkdir -p <repo>/poller/cmd/poller
+cd <repo>/poller
 go mod init github.com/luxarts/supervaisor-poller
 go get github.com/gorilla/websocket@latest
 go get github.com/fsnotify/fsnotify@latest
@@ -1904,7 +1904,7 @@ Expected: success.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add poller/
 git commit -m "feat(poller): bootstrap module with config"
 ```
@@ -2572,7 +2572,7 @@ func main() {
 - [ ] **Step 3: Build and smoke test**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor/poller
+cd <repo>/poller
 go build ./...
 # Run against a running backend:
 # 1. In one terminal: cd backend && go run ./cmd/server
@@ -2584,7 +2584,7 @@ Expected: backend's `/sessions` lists at least one real session derived from the
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add poller/
 git commit -m "feat(poller): scanner orchestrates tail+send on poll interval"
 ```
@@ -2601,7 +2601,7 @@ git commit -m "feat(poller): scanner orchestrates tail+send on poll interval"
 - [ ] **Step 1: Bootstrap Vite project**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 npm create vite@latest frontend -- --template react-ts -y
 cd frontend
 npm install
@@ -2697,7 +2697,7 @@ Expected: `HTTP/1.1 200 OK`.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/
 git commit -m "feat(frontend): scaffold Vite+TS+Tailwind with cyberpunk theme tokens"
 ```
@@ -3104,7 +3104,7 @@ ENTRYPOINT ["/server"]
 - [ ] **Step 2: Build it locally**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 docker build -f infrastructure/backend.Dockerfile -t supervaisor-backend:dev .
 ```
 Expected: image builds successfully.
@@ -3161,7 +3161,7 @@ EXPOSE 5173
 - [ ] **Step 3: Build it**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor/frontend
+cd <repo>/frontend
 docker build -t supervaisor-frontend:dev .
 ```
 Expected: image builds successfully.
@@ -3169,7 +3169,7 @@ Expected: image builds successfully.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 git add frontend/Dockerfile frontend/.dockerignore
 git commit -m "feat(infra): frontend Dockerfile (nginx serves static build)"
 ```
@@ -3240,7 +3240,7 @@ test:
 - [ ] **Step 3: End-to-end smoke test**
 
 ```bash
-cd /Users/lucasbacelo/Projects/supervAIsor
+cd <repo>
 make up
 sleep 5
 curl -s localhost:8080/healthz   # {"ok":true}

@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/luxarts/supervAIsor/main/install.sh
 
 The installer:
 1. Downloads the latest poller binary into `~/.local/bin/supervaisor`.
-2. Prompts you for the backend (e.g. `localhost:8080` or `mmm4p.local/supervaisor`).
+2. Prompts you for the backend (e.g. `localhost:8080` or `dashboard.local/supervaisor`).
 3. Writes `~/.supervaisor/settings.json`.
 4. Calls `supervaisor install` — registers a native background service (launchd on macOS, systemd `--user` on Linux), auto-starting at login and restarting on crash.
 
@@ -128,7 +128,7 @@ Examples of `backend`:
 |-----------------------------|------------------------------------------------|
 | `localhost:8080`            | `ws://localhost:8080/ws/ingest`                |
 | `10.0.0.5:8080`             | `ws://10.0.0.5:8080/ws/ingest`                 |
-| `mmm4p.local/supervaisor`   | `ws://mmm4p.local/supervaisor/ws/ingest`       |
+| `dashboard.local/supervaisor`   | `ws://dashboard.local/supervaisor/ws/ingest`       |
 
 After editing settings, restart the poller (`kill $(cat ~/.supervaisor/poller.pid) && bash <(curl -fsSL https://raw.githubusercontent.com/luxarts/supervAIsor/main/install.sh)` re-launches with the new values; or run the binary manually).
 

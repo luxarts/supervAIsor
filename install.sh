@@ -8,7 +8,7 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/luxarts/supervAIsor/main/install.sh | bash
 #   # or with a pre-set backend:
-#   SUPERVAISOR_BACKEND=mmm4p.local/supervaisor bash install.sh
+#   SUPERVAISOR_BACKEND=dashboard.local/supervaisor bash install.sh
 
 set -euo pipefail
 
