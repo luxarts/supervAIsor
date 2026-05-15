@@ -9,8 +9,10 @@ import (
 	"github.com/luxarts/supervaisor/internal/events"
 )
 
-const idleAfter = 30   // seconds
-const staleAfter = 3600 // seconds
+const (
+	workingDebounce = 2 * time.Second
+	staleAfter      = time.Hour
+)
 
 // Apply takes the previous session state (or nil for the first event)
 // and a new event, and returns the next session state. Pure function.
@@ -37,6 +39,17 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 	if p := DecodeProjectDir(env.ProjectDir); p != "" {
 		next.Project = p
 	}
+	// ProjectDirEncoded must hold the on-disk directory name (the
+	// "-Users-x-Projects-foo" form), which is what the poller needs to
+	// construct the JSONL path for delete. Prefer the explicit Raw field
+	// from new pollers; fall back to ProjectDir for backward compat when
+	// it doesn't look like a resolved absolute path.
+	switch {
+	case env.ProjectDirRaw != "":
+		next.ProjectDirEncoded = env.ProjectDirRaw
+	case env.ProjectDir != "" && !strings.HasPrefix(env.ProjectDir, "/"):
+		next.ProjectDirEncoded = env.ProjectDir
+	}
 
 	ts := env.FileMTime
 	if line.Timestamp != nil {
@@ -61,15 +74,10 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 	case "assistant":
 		applyAssistant(&next, line)
 	case "user":
-		applyUser(&next, line)
+		applyUser(&next, line, ts)
 	}
 
-	// Status derivation: working trumps all if any pending tool_use.
-	if len(next.PendingToolUseIDs) > 0 {
-		next.Status = StatusWorking
-	} else {
-		next.Status = StatusWaitingInput
-	}
+	RecomputeStatus(&next, ts)
 	return &next, nil
 }
 
@@ -96,7 +104,7 @@ func applyAssistant(s *Session, line events.RawLine) {
 	}
 }
 
-func applyUser(s *Session, line events.RawLine) {
+func applyUser(s *Session, line events.RawLine, ts time.Time) {
 	if line.Message == nil {
 		return
 	}
@@ -105,6 +113,9 @@ func applyUser(s *Session, line events.RawLine) {
 		if b.Type == "tool_result" {
 			sawToolResult = true
 			delete(s.PendingToolUseIDs, b.ToolUseID)
+			if b.IsError {
+				s.LastErrorAt = ts
+			}
 		}
 	}
 	if !sawToolResult {
@@ -164,9 +175,10 @@ func shortID(id string) string {
 	return id[:8]
 }
 
-// RecomputeStatus mutates s.Status based on elapsed time since last event.
-// Pending tool_use always wins. Otherwise transitions: waiting_input -> idle
-// after 30s, idle -> stale after 1h.
+// RecomputeStatus mutates s.Status based on pending tool_use and elapsed
+// time since the last event. WORKING when a tool is pending OR the last
+// event was within the debounce window (smooths intra-turn streaming).
+// STALE when older than 1h. DONE otherwise.
 func RecomputeStatus(s *Session, now time.Time) {
 	if len(s.PendingToolUseIDs) > 0 {
 		s.Status = StatusWorking
@@ -174,11 +186,11 @@ func RecomputeStatus(s *Session, now time.Time) {
 	}
 	age := now.Sub(s.LastEventAt)
 	switch {
-	case age >= time.Hour:
+	case age >= staleAfter:
 		s.Status = StatusStale
-	case age >= 30*time.Second:
-		s.Status = StatusIdle
+	case age < workingDebounce:
+		s.Status = StatusWorking
 	default:
-		s.Status = StatusWaitingInput
+		s.Status = StatusDone
 	}
 }

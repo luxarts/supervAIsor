@@ -3,13 +3,27 @@ import type { Session } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { formatDuration } from "../lib/time";
 import { shortProject } from "../lib/path";
+import { formatRelative } from "../lib/relativeTime";
 
 interface Props {
   session: Session;
   onOpen: () => void;
+  pinned?: boolean;
+  notify?: boolean;
+  errorActive?: boolean;
+  flash?: "complete" | "error" | null;
+  pollerOnline?: boolean;
 }
 
-export function SessionCard({ session, onOpen }: Props) {
+export function SessionCard({
+  session,
+  onOpen,
+  pinned = false,
+  notify = false,
+  errorActive = false,
+  flash = null,
+  pollerOnline,
+}: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -20,19 +34,60 @@ export function SessionCard({ session, onOpen }: Props) {
   const prompt = session.last_prompt_at
     ? now - new Date(session.last_prompt_at).getTime()
     : null;
+  const age = now - new Date(session.last_event_at).getTime();
+
+  const flashClass =
+    flash === "error" ? "flash-error" : flash === "complete" ? "flash-complete" : "";
+  const borderColor = errorActive
+    ? "border-rd"
+    : "border-cy/30 hover:border-cy";
+  const workingGlow =
+    session.status === "working" && !errorActive
+      ? "shadow-[0_0_18px_rgba(0,240,255,0.25)]"
+      : "";
+  // When the host poller is offline, dim the entire card so it visibly
+  // recedes — the user cannot delete it and any state on screen may be
+  // stale until the poller reconnects.
+  const offlineDim =
+    pollerOnline === false ? "opacity-50 grayscale" : "";
 
   return (
     <button
       type="button"
       onClick={onOpen}
+      data-poller-online={pollerOnline === false ? "false" : "true"}
+      title={pollerOnline === false ? `Poller offline on ${session.hostname}` : undefined}
       className={`relative min-h-[160px] w-full border bg-bg-panel p-4 text-left transition-colors
-                  border-cy/30 hover:border-cy active:scale-[0.99] touch-manipulation
+                  active:scale-[0.99] touch-manipulation
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cy
-                  ${session.status === "working" ? "shadow-[0_0_18px_rgba(0,240,255,0.25)]" : ""}`}
+                  ${borderColor} ${workingGlow} ${flashClass} ${offlineDim}`}
     >
       <header className="flex items-start justify-between gap-2">
-        <StatusBadge status={session.status} />
-        <div className="font-hud text-[10px] text-dim truncate max-w-[55%]">
+        <div className="flex items-center gap-2">
+          <StatusBadge status={session.status} />
+          <span className="font-hud text-[10px] text-dim">
+            · {formatRelative(age)}
+          </span>
+          {pinned && (
+            <span
+              aria-label="Pinned"
+              title="Pinned"
+              className="font-hud text-sm leading-none text-cy"
+            >
+              ▣
+            </span>
+          )}
+          {notify && (
+            <span
+              aria-label="Notify enabled"
+              title="Notify enabled"
+              className="font-hud text-sm leading-none text-yl"
+            >
+              ◉
+            </span>
+          )}
+        </div>
+        <div className="font-hud text-[10px] text-dim truncate max-w-[40%]">
           {shortProject(session.project)}
         </div>
       </header>

@@ -14,9 +14,11 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-// SnapshotProvider supplies the current session list for initial hydration.
+// SnapshotProvider supplies the current session list and per-host poller
+// liveness for initial hydration.
 type SnapshotProvider interface {
 	Snapshot() []*state.Session
+	PollersOnline() map[string]bool
 }
 
 // Handler upgrades HTTP connections to WebSocket, sends a snapshot frame,
@@ -27,9 +29,14 @@ type Handler struct {
 }
 
 type frame struct {
-	Kind     string           `json:"kind"`
-	Sessions []*state.Session `json:"sessions,omitempty"`
+	Kind string `json:"kind"`
+	// Sessions and Online intentionally do NOT use omitempty: encoding/json
+	// omits empty slices and maps, which would make a fresh-install
+	// snapshot/pollers frame arrive with no "sessions"/"online" key at all,
+	// crashing the frontend's setSessions/setPollersOnline.
+	Sessions []*state.Session `json:"sessions"`
 	Session  *state.Session   `json:"session,omitempty"`
+	Online   map[string]bool  `json:"online"`
 }
 
 // Serve handles the /ws/clients WebSocket endpoint.
@@ -44,6 +51,11 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	// Send initial snapshot so the client can hydrate without a REST call.
 	snap := frame{Kind: "snapshot", Sessions: h.Snapshot.Snapshot()}
 	if b, err := json.Marshal(snap); err == nil {
+		_ = conn.WriteMessage(websocket.TextMessage, b)
+	}
+
+	pollersFrame := frame{Kind: "pollers", Online: h.Snapshot.PollersOnline()}
+	if b, err := json.Marshal(pollersFrame); err == nil {
 		_ = conn.WriteMessage(websocket.TextMessage, b)
 	}
 

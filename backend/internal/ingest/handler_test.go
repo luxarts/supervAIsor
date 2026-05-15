@@ -67,6 +67,48 @@ func TestIngest_PersistsAndBroadcasts(t *testing.T) {
 	}
 }
 
+func TestIngest_DeleteAckRoutesToCoordinator(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "ack.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	hub := broadcast.NewHub()
+	go hub.Run()
+	defer hub.Stop()
+
+	reg := NewRegistry()
+	coord := NewDeleteCoordinator(2 * time.Second)
+	defer coord.Close()
+
+	h := &Handler{Store: db, Hub: hub, Registry: reg, Coordinator: coord}
+	srv := httptest.NewServer(http.HandlerFunc(h.Serve))
+	defer srv.Close()
+
+	c, _, err := websocket.DefaultDialer.Dial(wsURL(srv.URL), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	resp, _ := coord.Begin("req-X")
+
+	ack := []byte(`{"type":"delete_ack","request_id":"req-X","session_id":"abc","ok":true}`)
+	if err := c.WriteMessage(websocket.TextMessage, ack); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case r := <-resp:
+		if r.Err != nil {
+			t.Errorf("Err = %v, want nil", r.Err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("ack never resolved coordinator")
+	}
+}
+
 func TestIngest_AcceptsConcurrentPollers(t *testing.T) {
 	db, _ := store.Open(filepath.Join(t.TempDir(), "i.db"))
 	defer db.Close()

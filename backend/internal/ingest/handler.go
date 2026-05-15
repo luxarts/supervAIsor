@@ -23,8 +23,10 @@ var upgrader = websocket.Upgrader{
 // persisting, and broadcasting updates. Multiple concurrent pollers are
 // supported; sessions are keyed by (hostname, session_id).
 type Handler struct {
-	Store *store.SQLite
-	Hub   *broadcast.Hub
+	Store       *store.SQLite
+	Hub         *broadcast.Hub
+	Registry    *Registry
+	Coordinator *DeleteCoordinator
 }
 
 type updateFrame struct {
@@ -32,7 +34,19 @@ type updateFrame struct {
 	Session *state.Session `json:"session"`
 }
 
-// Serve handles a single /ws/ingest WebSocket connection.
+// envelopeWithType is used to peek at the discriminator before full decode.
+type envelopeWithType struct {
+	Type      string `json:"type"`
+	Hostname  string `json:"hostname,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+	OK        bool   `json:"ok,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// Serve handles a single /ws/ingest WebSocket connection. Splits into a
+// reader goroutine (existing event-processing path) and a writer goroutine
+// (drains the registry's writer channel for this connection).
 func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -41,6 +55,36 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	writeCh := make(chan []byte, 16)
+	done := make(chan struct{})
+
+	// Writer goroutine.
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case msg, ok := <-writeCh:
+				if !ok {
+					return
+				}
+				_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+				if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+					return
+				}
+			}
+		}
+	}()
+	defer close(done)
+
+	var registeredHost string
+	defer func() {
+		if registeredHost != "" && h.Registry != nil {
+			h.Registry.Remove(registeredHost, writeCh)
+			log.Printf("ingest: unregistered poller hostname=%q", registeredHost)
+		}
+	}()
+
 	ctx := r.Context()
 	for {
 		_, data, err := conn.ReadMessage()
@@ -48,6 +92,28 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Peek at discriminator.
+		var head envelopeWithType
+		_ = json.Unmarshal(data, &head)
+
+		if head.Type == "delete_ack" {
+			log.Printf("ingest: delete_ack req=%s ok=%v err=%q", head.RequestID, head.OK, head.Error)
+			if h.Coordinator != nil {
+				h.Coordinator.Resolve(head.RequestID, head.OK, head.Error)
+			}
+			continue
+		}
+
+		if head.Type == "hello" {
+			if head.Hostname != "" && registeredHost == "" && h.Registry != nil {
+				h.Registry.Add(head.Hostname, writeCh)
+				registeredHost = head.Hostname
+				log.Printf("ingest: registered poller via hello hostname=%q", head.Hostname)
+			}
+			continue
+		}
+
+		// Default path: treat as event envelope.
 		var env events.IngestEnvelope
 		if err := json.Unmarshal(data, &env); err != nil {
 			log.Printf("ingest: malformed envelope: %v", err)
@@ -59,6 +125,12 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		if registeredHost == "" && h.Registry != nil {
+			h.Registry.Add(env.Hostname, writeCh)
+			registeredHost = env.Hostname
+			log.Printf("ingest: registered poller hostname=%q", env.Hostname)
+		}
+
 		prev, _ := h.Store.GetSession(ctx, env.Hostname, env.SessionID)
 		next, err := state.Apply(prev, env)
 		if err != nil {
@@ -66,7 +138,6 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Recompute time-based status transitions immediately.
 		state.RecomputeStatus(next, time.Now().UTC())
 
 		if err := h.Store.UpsertSession(ctx, next); err != nil {

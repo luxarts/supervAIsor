@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/luxarts/supervaisor-poller/internal/deleter"
 	"github.com/luxarts/supervaisor-poller/internal/hostname"
 	"github.com/luxarts/supervaisor-poller/internal/offsets"
 	"github.com/luxarts/supervaisor-poller/internal/scanner"
@@ -125,8 +127,45 @@ func main() {
 		log.Fatalf("load offsets: %v", err)
 	}
 	cli := wsclient.New(url)
+	del := deleter.New(cfg.ProjectsDir, cfg.StateFile, off)
+	cli.OnCommand = func(cmd wsclient.Command) error {
+		switch cmd.Type {
+		case "delete":
+			return del.Delete(context.Background(), cmd.SessionID, cmd.ProjectDir)
+		default:
+			return nil
+		}
+	}
+	// Announce ourselves on every (re)connect so the backend marks the host
+	// online without waiting for the first JSONL event to flow.
+	cli.OnConnect = func() {
+		if err := cli.Send(map[string]any{"type": "hello", "hostname": host}); err != nil {
+			log.Printf("hello: %v", err)
+			return
+		}
+		log.Printf("hello sent host=%s", host)
+	}
 
 	stop := make(chan struct{})
+	// Re-launch Run on every reconnect: ReadMessage exits permanently when
+	// the underlying conn drops, so we need to relaunch it after the scanner
+	// re-establishes the connection. The loop polls for a live conn cheaply
+	// and exits when stop is closed.
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			cli.Run(stop)
+			select {
+			case <-stop:
+				return
+			case <-time.After(time.Second):
+			}
+		}
+	}()
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {

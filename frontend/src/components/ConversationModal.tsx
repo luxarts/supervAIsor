@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { shortProject } from "../lib/path";
+import { SessionDetails } from "./SessionDetails";
 
 interface ContentBlock {
   type: string;
@@ -33,6 +34,7 @@ interface Props {
   lastEventAt: string;
   backendHttpBase: string;
   onClose: () => void;
+  pollerOnline?: boolean;
 }
 
 export function ConversationModal({
@@ -43,9 +45,11 @@ export function ConversationModal({
   lastEventAt,
   backendHttpBase,
   onClose,
+  pollerOnline,
 }: Props) {
   const [events, setEvents] = useState<Event[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"conversation" | "details">("conversation");
   const bodyRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +57,7 @@ export function ConversationModal({
   useEffect(() => {
     setEvents(null);
     setError(null);
+    setTab("conversation");
   }, [sessionId, hostname]);
 
   // Refetch on mount, on session change, and whenever the underlying session
@@ -79,10 +84,10 @@ export function ConversationModal({
   }, [sessionId, hostname, lastEventAt, backendHttpBase]);
 
   useEffect(() => {
-    if (events && bodyRef.current) {
+    if (tab === "conversation" && events && bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
-  }, [events]);
+  }, [events, tab]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -181,22 +186,58 @@ export function ConversationModal({
           </button>
         </header>
 
+        <div role="tablist" className="flex border-b border-cy/20">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "conversation"}
+            onClick={() => setTab("conversation")}
+            className={`flex-1 py-2 font-hud text-xs uppercase tracking-widest min-h-[44px] touch-manipulation
+                        ${tab === "conversation" ? "text-cy border-b-2 border-cy" : "text-dim hover:text-cy"}`}
+          >
+            CONVERSATION
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "details"}
+            onClick={() => setTab("details")}
+            className={`flex-1 py-2 font-hud text-xs uppercase tracking-widest min-h-[44px] touch-manipulation
+                        ${tab === "details" ? "text-cy border-b-2 border-cy" : "text-dim hover:text-cy"}`}
+          >
+            DETAILS
+          </button>
+        </div>
+
         <div
           ref={bodyRef}
           className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-3 space-y-3"
         >
-          {error && (
-            <div className="font-hud text-rd">// EVENT FEED LOST: {error}</div>
+          {tab === "conversation" ? (
+            <>
+              {error && (
+                <div className="font-hud text-rd">// EVENT FEED LOST: {error}</div>
+              )}
+              {!error && events === null && (
+                <div className="font-hud text-dim">// LOADING…</div>
+              )}
+              {!error && events && events.length === 0 && (
+                <div className="font-hud text-dim">// NO MESSAGES</div>
+              )}
+              {!error && events && events.map((ev, i) => (
+                <MessageView key={i} ev={ev} />
+              ))}
+            </>
+          ) : (
+            <SessionDetails
+              sessionId={sessionId}
+              hostname={hostname}
+              lastEventAt={lastEventAt}
+              backendHttpBase={backendHttpBase}
+              pollerOnline={pollerOnline}
+              onDeleted={onClose}
+            />
           )}
-          {!error && events === null && (
-            <div className="font-hud text-dim">// LOADING…</div>
-          )}
-          {!error && events && events.length === 0 && (
-            <div className="font-hud text-dim">// NO MESSAGES</div>
-          )}
-          {!error && events && events.map((ev, i) => (
-            <MessageView key={i} ev={ev} />
-          ))}
         </div>
       </div>
     </div>

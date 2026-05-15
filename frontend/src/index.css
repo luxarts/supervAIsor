@@ -27,3 +27,21 @@ html, body, #root {
 .md pre { background: rgba(0, 0, 0, 0.4); padding: 0.5rem; overflow-x: auto; border-radius: 2px; max-width: 100%; white-space: pre-wrap; word-break: break-all; }
 .md pre code { background: transparent; padding: 0; }
 .md blockquote { border-left: 2px solid rgba(0, 240, 255, 0.4); padding-left: 0.5rem; color: #888; }
+
+@keyframes flash-complete-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(252, 238, 10, 0.0); }
+  10%  { box-shadow: 0 0 28px 4px rgba(252, 238, 10, 0.85); }
+  35%  { box-shadow: 0 0 0 0 rgba(252, 238, 10, 0.0); }
+  45%  { box-shadow: 0 0 28px 4px rgba(0, 240, 255, 0.85); }
+  70%  { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.0); }
+  80%  { box-shadow: 0 0 28px 4px rgba(252, 238, 10, 0.85); }
+  100% { box-shadow: 0 0 0 0 rgba(252, 238, 10, 0.0); }
+}
+.flash-complete { animation: flash-complete-kf 1.2s ease-out 1; }
+
+@keyframes flash-error-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 0, 60, 0.0); }
+  20%  { box-shadow: 0 0 30px 6px rgba(255, 0, 60, 0.95); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 0, 60, 0.0); }
+}
+.flash-error { animation: flash-error-kf 0.9s ease-out 1; }

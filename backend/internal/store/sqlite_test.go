@@ -152,6 +152,88 @@ func TestAppendEvent_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestListEvents_NegativeLimitReturnsAll(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	mustAppend := func(offset time.Duration, typ, payload string) {
+		t.Helper()
+		if err := s.AppendEvent(ctx, "host-test", "sess-neg", now.Add(offset), typ, []byte(payload)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustAppend(0, "user", `{"n":1}`)
+	mustAppend(time.Second, "assistant", `{"n":2}`)
+	mustAppend(2*time.Second, "user", `{"n":3}`)
+
+	evs, err := s.ListEvents(ctx, "host-test", "sess-neg", -1)
+	if err != nil {
+		t.Fatalf("ListEvents with -1 failed: %v", err)
+	}
+	if len(evs) != 3 {
+		t.Errorf("got %d events with limit=-1, want 3 (all rows)", len(evs))
+	}
+}
+
+func TestUpsertSession_RoundTripsLastErrorAt(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "err.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:      state.StatusDone,
+		StartedAt:   t0,
+		LastEventAt: t0.Add(time.Minute),
+		LastErrorAt: t0.Add(30 * time.Second),
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetSession(ctx, "h", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("got nil session")
+	}
+	if !got.LastErrorAt.Equal(in.LastErrorAt) {
+		t.Errorf("LastErrorAt = %v, want %v", got.LastErrorAt, in.LastErrorAt)
+	}
+}
+
+func TestUpsertSession_ZeroLastErrorAtRoundTrips(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "noerr.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:      state.StatusDone,
+		StartedAt:   t0,
+		LastEventAt: t0,
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetSession(ctx, "h", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.LastErrorAt.IsZero() {
+		t.Errorf("LastErrorAt = %v, want zero", got.LastErrorAt)
+	}
+}
+
 func TestUpsertSession_SameIDDifferentHosts(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
@@ -181,5 +263,82 @@ func TestUpsertSession_SameIDDifferentHosts(t *testing.T) {
 	gb, _ := s.GetSession(ctx, "mac-B", "uuid-1")
 	if ga == nil || ga.Name != "A" || gb == nil || gb.Name != "B" {
 		t.Errorf("rows did not isolate by hostname: A=%v B=%v", ga, gb)
+	}
+}
+
+func TestDeleteSession_RemovesSessionAndEvents(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "del.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:      state.StatusDone,
+		StartedAt:   t0,
+		LastEventAt: t0,
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AppendEvent(ctx, "h", "abc", t0, "user", []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AppendEvent(ctx, "h", "abc", t0, "assistant", []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := st.DeleteSession(ctx, "h", "abc"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := st.GetSession(ctx, "h", "abc")
+	if got != nil {
+		t.Errorf("session still present after delete: %+v", got)
+	}
+	evs, _ := st.ListEvents(ctx, "h", "abc", -1)
+	if len(evs) != 0 {
+		t.Errorf("events not purged: %d remain", len(evs))
+	}
+}
+
+func TestDeleteSession_NoOpOnMissing(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "del2.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.DeleteSession(context.Background(), "h", "missing"); err != nil {
+		t.Errorf("DeleteSession on missing should be no-op, got %v", err)
+	}
+}
+
+func TestUpsertSession_RoundTripsProjectDirEncoded(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "pde.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:            state.StatusDone,
+		StartedAt:         t0,
+		LastEventAt:       t0,
+		ProjectDirEncoded: "-Users-x-Projects-foo",
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetSession(ctx, "h", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ProjectDirEncoded != "-Users-x-Projects-foo" {
+		t.Errorf("ProjectDirEncoded = %q", got.ProjectDirEncoded)
 	}
 }

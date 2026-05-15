@@ -14,13 +14,17 @@ import (
 )
 
 // Envelope matches the backend's events.IngestEnvelope JSON shape.
+// ProjectDir is the resolved filesystem path (e.g. /Users/x/Projects/foo);
+// ProjectDirRaw is the on-disk dir name (e.g. -Users-x-Projects-foo) — the
+// source of truth for filesystem operations like delete.
 type Envelope struct {
-	Hostname   string          `json:"hostname"`
-	SessionID  string          `json:"session_id"`
-	ProjectDir string          `json:"project_dir"`
-	FileMTime  time.Time       `json:"file_mtime"`
-	LineIndex  int             `json:"line_index"`
-	Raw        json.RawMessage `json:"raw"`
+	Hostname      string          `json:"hostname"`
+	SessionID     string          `json:"session_id"`
+	ProjectDir    string          `json:"project_dir"`
+	ProjectDirRaw string          `json:"project_dir_raw,omitempty"`
+	FileMTime     time.Time       `json:"file_mtime"`
+	LineIndex     int             `json:"line_index"`
+	Raw           json.RawMessage `json:"raw"`
 }
 
 // Scanner walks the Claude projects directory and ships new JSONL lines to the
@@ -51,13 +55,14 @@ func (s *Scanner) RunOnce() error {
 			continue
 		}
 		resolvedProject := ResolveProjectPath(e.Name())
+		rawProjectDir := e.Name()
 		for _, f := range files {
 			if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
 				continue
 			}
 			path := filepath.Join(dirPath, f.Name())
 			sessionID := strings.TrimSuffix(f.Name(), ".jsonl")
-			if err := s.processFile(path, resolvedProject, sessionID); err != nil {
+			if err := s.processFile(path, resolvedProject, rawProjectDir, sessionID); err != nil {
 				log.Printf("process %s: %v", path, err)
 			}
 		}
@@ -66,8 +71,10 @@ func (s *Scanner) RunOnce() error {
 }
 
 // processFile tails a single .jsonl file, detects inode changes (rotation),
-// and sends each valid JSON line as an Envelope to the backend.
-func (s *Scanner) processFile(path, projectDir, sessionID string) error {
+// and sends each valid JSON line as an Envelope to the backend. projectDir
+// is the resolved filesystem path for display; rawProjectDir is the on-disk
+// directory name used by the deleter to reconstruct the JSONL path.
+func (s *Scanner) processFile(path, projectDir, rawProjectDir, sessionID string) error {
 	prevOff, prevIno, _ := s.Offsets.Get(path)
 
 	t := &tailer.Tailer{Path: path, Offset: prevOff}
@@ -94,12 +101,13 @@ func (s *Scanner) processFile(path, projectDir, sessionID string) error {
 
 	for i, line := range lines {
 		env := Envelope{
-			Hostname:   s.Hostname,
-			SessionID:  sessionID,
-			ProjectDir: projectDir,
-			FileMTime:  fi.ModTime().UTC(),
-			LineIndex:  int(prevOff) + i, // approximate line index
-			Raw:        json.RawMessage(line),
+			Hostname:      s.Hostname,
+			SessionID:     sessionID,
+			ProjectDir:    projectDir,
+			ProjectDirRaw: rawProjectDir,
+			FileMTime:     fi.ModTime().UTC(),
+			LineIndex:     int(prevOff) + i, // approximate line index
+			Raw:           json.RawMessage(line),
 		}
 		if !json.Valid(env.Raw) {
 			continue

@@ -1,18 +1,36 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/luxarts/supervaisor/internal/broadcast"
+	"github.com/luxarts/supervaisor/internal/events"
+	"github.com/luxarts/supervaisor/internal/ingest"
 	"github.com/luxarts/supervaisor/internal/state"
 	"github.com/luxarts/supervaisor/internal/store"
 )
 
+// PollerSender is the subset of *ingest.Registry the API needs. Fakeable
+// in tests.
+type PollerSender interface {
+	IsOnline(hostname string) bool
+	Send(hostname string, payload []byte) error
+}
+
 // Handler holds dependencies for the REST API handlers.
 type Handler struct {
-	Store *store.SQLite
+	Store       *store.SQLite
+	Sender      PollerSender
+	Coordinator *ingest.DeleteCoordinator
+	Hub         *broadcast.Hub
 }
 
 // Register mounts all REST routes onto the given Gin engine.
@@ -22,6 +40,8 @@ func (h *Handler) Register(r *gin.Engine) {
 	})
 	r.GET("/sessions", h.listSessions)
 	r.GET("/sessions/:hostname/:id/events", h.getSessionEvents)
+	r.GET("/sessions/:hostname/:id/stats", h.getSessionStats)
+	r.DELETE("/sessions/:hostname/:id", h.deleteSession)
 }
 
 func (h *Handler) listSessions(c *gin.Context) {
@@ -64,8 +84,132 @@ func (h *Handler) getSessionEvents(c *gin.Context) {
 		return
 	}
 	if evs == nil {
-		evs = []store.Event{}
+		evs = []events.Event{}
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, evs)
+}
+
+func (h *Handler) getSessionStats(c *gin.Context) {
+	hostname := c.Param("hostname")
+	id := c.Param("id")
+	ctx := c.Request.Context()
+
+	sess, err := h.Store.GetSession(ctx, hostname, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if sess == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+		return
+	}
+
+	// Pass -1 for unlimited so aggregates include the full event log.
+	evs, err := h.Store.ListEvents(ctx, hostname, id, -1)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	stats := state.ComputeStats(evs, sess)
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, stats)
+}
+
+type deleteCommand struct {
+	Type       string `json:"type"`
+	RequestID  string `json:"request_id"`
+	SessionID  string `json:"session_id"`
+	ProjectDir string `json:"project_dir"`
+}
+
+type sessionRemovedFrame struct {
+	Kind     string `json:"kind"`
+	Hostname string `json:"hostname"`
+	ID       string `json:"id"`
+}
+
+func newRequestID() string {
+	var b [12]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+func (h *Handler) deleteSession(c *gin.Context) {
+	hostname := c.Param("hostname")
+	id := c.Param("id")
+	ctx := c.Request.Context()
+
+	log.Printf("api.delete: hostname=%s id=%s", hostname, id)
+
+	sess, err := h.Store.GetSession(ctx, hostname, id)
+	if err != nil {
+		log.Printf("api.delete: GetSession failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if sess == nil {
+		log.Printf("api.delete: session not found")
+		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+		return
+	}
+	if h.Sender == nil || !h.Sender.IsOnline(hostname) {
+		log.Printf("api.delete: poller offline for hostname=%s", hostname)
+		c.JSON(http.StatusConflict, gin.H{"error": "poller offline"})
+		return
+	}
+
+	reqID := newRequestID()
+	respCh, err := h.Coordinator.Begin(reqID)
+	if err != nil {
+		log.Printf("api.delete: coordinator.Begin failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	cmd := deleteCommand{
+		Type:       "delete",
+		RequestID:  reqID,
+		SessionID:  id,
+		ProjectDir: sess.ProjectDirEncoded,
+	}
+	body, _ := json.Marshal(cmd)
+	log.Printf("api.delete: dispatching to poller hostname=%s req=%s project_dir=%q", hostname, reqID, sess.ProjectDirEncoded)
+	if err := h.Sender.Send(hostname, body); err != nil {
+		log.Printf("api.delete: sender.Send failed: %v", err)
+		h.Coordinator.Resolve(reqID, false, err.Error())
+		<-respCh
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+	log.Printf("api.delete: awaiting ack req=%s", reqID)
+
+	select {
+	case r := <-respCh:
+		if r.Err != nil {
+			log.Printf("api.delete: ack with error req=%s err=%v", reqID, r.Err)
+			if errors.Is(r.Err, ingest.ErrTimeout) {
+				c.JSON(http.StatusGatewayTimeout, gin.H{"error": r.Err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": r.Err.Error()})
+			return
+		}
+		log.Printf("api.delete: ack ok req=%s", reqID)
+	case <-ctx.Done():
+		log.Printf("api.delete: client cancelled req=%s", reqID)
+		c.JSON(http.StatusGatewayTimeout, gin.H{"error": "client cancelled"})
+		return
+	}
+
+	if err := h.Store.DeleteSession(ctx, hostname, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if h.Hub != nil {
+		removed := sessionRemovedFrame{Kind: "session_removed", Hostname: hostname, ID: id}
+		if b, err := json.Marshal(removed); err == nil {
+			h.Hub.Broadcast(b)
+		}
+	}
+	c.Status(http.StatusNoContent)
 }

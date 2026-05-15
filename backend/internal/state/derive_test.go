@@ -100,12 +100,13 @@ func TestApply_ToolResult_ClearsPending(t *testing.T) {
 		Status:            StatusWorking,
 		PendingToolUseIDs: map[string]struct{}{"tool_1": {}},
 	}
+	eventTime := now.Add(-3 * time.Second)
 	env := events.IngestEnvelope{
 		SessionID: "abc", ProjectDir: "-tmp",
-		FileMTime: now, LineIndex: 2,
+		FileMTime: eventTime, LineIndex: 2,
 		Raw: mustRaw(t, map[string]any{
 			"type":      "user",
-			"timestamp": now,
+			"timestamp": eventTime,
 			"message": map[string]any{
 				"role": "user",
 				"content": []any{
@@ -124,29 +125,42 @@ func TestApply_ToolResult_ClearsPending(t *testing.T) {
 	if _, ok := got.PendingToolUseIDs["tool_1"]; ok {
 		t.Errorf("tool_1 should have been cleared")
 	}
-	// Status would be re-derived to working only if there are still pending IDs.
-	if got.Status == StatusWorking {
-		t.Errorf("Status should not still be working after last tool_result cleared")
+	// Apply calls RecomputeStatus(&next, ts) where ts is the event timestamp,
+	// and LastEventAt was just set to that same ts — so age=0 falls inside the
+	// 2-s WORKING debounce. The runStatusTicker (wall-clock-driven) is what
+	// later flips the session to DONE once 2s have elapsed.
+	if got.Status != StatusWorking {
+		t.Errorf("Status = %q, want working (debounce window)", got.Status)
 	}
 }
 
-func TestRecomputeStatus_IdleAfter30s(t *testing.T) {
+func TestRecomputeStatus_DoneAfter2sNoPending(t *testing.T) {
 	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
 	s := &Session{
-		Status:            StatusWaitingInput,
-		LastEventAt:       now.Add(-31 * time.Second),
+		LastEventAt:       now.Add(-3 * time.Second),
 		PendingToolUseIDs: map[string]struct{}{},
 	}
 	RecomputeStatus(s, now)
-	if s.Status != StatusIdle {
-		t.Errorf("Status = %q, want idle", s.Status)
+	if s.Status != StatusDone {
+		t.Errorf("Status = %q, want done", s.Status)
+	}
+}
+
+func TestRecomputeStatus_WorkingDebounceUnder2s(t *testing.T) {
+	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
+	s := &Session{
+		LastEventAt:       now.Add(-1 * time.Second),
+		PendingToolUseIDs: map[string]struct{}{},
+	}
+	RecomputeStatus(s, now)
+	if s.Status != StatusWorking {
+		t.Errorf("Status = %q, want working (within 2-s debounce)", s.Status)
 	}
 }
 
 func TestRecomputeStatus_StaleAfter1h(t *testing.T) {
 	now := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
 	s := &Session{
-		Status:            StatusIdle,
 		LastEventAt:       now.Add(-2 * time.Hour),
 		PendingToolUseIDs: map[string]struct{}{},
 	}
@@ -168,6 +182,79 @@ func TestRecomputeStatus_WorkingNotDowngraded(t *testing.T) {
 	}
 }
 
+func TestApply_ToolResultError_SetsLastErrorAt(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	prev := &Session{
+		ID:                "abc",
+		StartedAt:         now.Add(-1 * time.Minute),
+		LastEventAt:       now.Add(-10 * time.Second),
+		Status:            StatusWorking,
+		PendingToolUseIDs: map[string]struct{}{"tool_1": {}},
+	}
+	env := events.IngestEnvelope{
+		SessionID: "abc", ProjectDir: "-tmp",
+		FileMTime: now, LineIndex: 2,
+		Raw: mustRaw(t, map[string]any{
+			"type":      "user",
+			"timestamp": now,
+			"message": map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type":        "tool_result",
+						"tool_use_id": "tool_1",
+						"is_error":    true,
+					},
+				},
+			},
+		}),
+	}
+	got, err := Apply(prev, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.LastErrorAt.Equal(now) {
+		t.Errorf("LastErrorAt = %v, want %v", got.LastErrorAt, now)
+	}
+}
+
+func TestApply_ToolResultSuccess_PreservesLastErrorAt(t *testing.T) {
+	earlier := time.Date(2026, 5, 15, 9, 59, 0, 0, time.UTC)
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	prev := &Session{
+		ID:                "abc",
+		StartedAt:         earlier.Add(-1 * time.Minute),
+		LastEventAt:       earlier,
+		LastErrorAt:       earlier,
+		Status:            StatusWorking,
+		PendingToolUseIDs: map[string]struct{}{"tool_2": {}},
+	}
+	env := events.IngestEnvelope{
+		SessionID: "abc", ProjectDir: "-tmp",
+		FileMTime: now, LineIndex: 3,
+		Raw: mustRaw(t, map[string]any{
+			"type":      "user",
+			"timestamp": now,
+			"message": map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type":        "tool_result",
+						"tool_use_id": "tool_2",
+					},
+				},
+			},
+		}),
+	}
+	got, err := Apply(prev, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.LastErrorAt.Equal(earlier) {
+		t.Errorf("LastErrorAt = %v, want %v (success result must not clear)", got.LastErrorAt, earlier)
+	}
+}
+
 func TestApply_SetsHostnameOnFirstEvent(t *testing.T) {
 	now := time.Now().UTC()
 	env := events.IngestEnvelope{
@@ -182,5 +269,25 @@ func TestApply_SetsHostnameOnFirstEvent(t *testing.T) {
 	}
 	if got.Hostname != "mac-A" {
 		t.Errorf("Hostname = %q, want mac-A", got.Hostname)
+	}
+}
+
+func TestApply_PropagatesProjectDirEncoded(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	env := events.IngestEnvelope{
+		Hostname: "h", SessionID: "abc",
+		ProjectDir: "-Users-x-Projects-foo",
+		FileMTime:  now,
+		Raw: mustRaw(t, map[string]any{
+			"type":      "user",
+			"timestamp": now,
+		}),
+	}
+	got, err := Apply(nil, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ProjectDirEncoded != "-Users-x-Projects-foo" {
+		t.Errorf("ProjectDirEncoded = %q, want -Users-x-Projects-foo", got.ProjectDirEncoded)
 	}
 }

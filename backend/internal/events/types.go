@@ -6,13 +6,21 @@ import (
 )
 
 // IngestEnvelope is one message the poller sends over /ws/ingest.
+//
+// ProjectDir is the resolved filesystem path (e.g. /Users/x/Projects/foo)
+// that the poller smart-decoded from Claude's encoded directory name,
+// using the host filesystem to disambiguate names containing "-".
+// ProjectDirRaw is the on-disk directory name (e.g. -Users-x-Projects-foo)
+// — the source of truth for filesystem operations like delete. New pollers
+// always populate both; older pollers only send ProjectDir.
 type IngestEnvelope struct {
-	Hostname   string          `json:"hostname"`
-	SessionID  string          `json:"session_id"`
-	ProjectDir string          `json:"project_dir"`
-	FileMTime  time.Time       `json:"file_mtime"`
-	LineIndex  int             `json:"line_index"`
-	Raw        json.RawMessage `json:"raw"`
+	Hostname      string          `json:"hostname"`
+	SessionID     string          `json:"session_id"`
+	ProjectDir    string          `json:"project_dir"`
+	ProjectDirRaw string          `json:"project_dir_raw,omitempty"`
+	FileMTime     time.Time       `json:"file_mtime"`
+	LineIndex     int             `json:"line_index"`
+	Raw           json.RawMessage `json:"raw"`
 }
 
 // RawLine is the parsed shape of a JSONL line; we only model the fields
@@ -36,19 +44,35 @@ type RawLine struct {
 // so callers can treat Content uniformly.
 type MessageContent struct {
 	Role    string         `json:"role,omitempty"`
+	Model   string         `json:"model,omitempty"`
+	Usage   *Usage         `json:"usage,omitempty"`
 	Content []ContentBlock `json:"content,omitempty"`
 }
 
-// UnmarshalJSON accepts either []ContentBlock or string for the content field.
+// Usage carries the token accounting fields Anthropic returns on
+// assistant messages. Any field may be zero/missing.
+type Usage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+}
+
+// UnmarshalJSON accepts either []ContentBlock or string for the content field
+// and additionally captures model + usage when present.
 func (m *MessageContent) UnmarshalJSON(data []byte) error {
 	var aux struct {
 		Role    string          `json:"role,omitempty"`
+		Model   string          `json:"model,omitempty"`
+		Usage   *Usage          `json:"usage,omitempty"`
 		Content json.RawMessage `json:"content,omitempty"`
 	}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	m.Role = aux.Role
+	m.Model = aux.Model
+	m.Usage = aux.Usage
 	if len(aux.Content) == 0 || string(aux.Content) == "null" {
 		m.Content = nil
 		return nil
@@ -73,4 +97,14 @@ type ContentBlock struct {
 	Input     json.RawMessage `json:"input,omitempty"`       // tool_use
 	ID        string          `json:"id,omitempty"`          // tool_use id
 	ToolUseID string          `json:"tool_use_id,omitempty"` // tool_result
+	IsError   bool            `json:"is_error,omitempty"`    // tool_result
+}
+
+// Event is one row from the events table, as returned by store.ListEvents.
+// Defined here (not in store) to avoid an import cycle: store imports state,
+// and state needs this type for ComputeStats.
+type Event struct {
+	TS      time.Time       `json:"ts"`
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
 }

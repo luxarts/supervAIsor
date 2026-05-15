@@ -62,5 +62,16 @@ func (s *Store) Get(file string) (offset int64, inode uint64, ok bool) {
 func (s *Store) Set(file string, inode uint64, offset int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.m == nil {
+		s.m = map[string]fileOffset{}
+	}
 	s.m[file] = fileOffset{Inode: inode, Offset: offset}
+}
+
+// Forget removes the offset entry for the given file path. Caller is
+// responsible for persisting via Save.
+func (s *Store) Forget(file string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.m, file)
 }
