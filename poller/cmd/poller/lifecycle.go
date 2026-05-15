@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,7 @@ Usage: supervaisor <command>
 Commands:
   install     Install the background service (launchd on macOS, systemd --user on Linux)
   uninstall   Stop the service, remove the unit file, the binary, and ~/.supervaisor/
+              (pass -y / --yes to skip the confirmation prompt)
   start       Start the installed service
   stop        Stop the service
   restart     Restart the service
@@ -148,6 +150,10 @@ func cmdStatus() error {
 }
 
 func cmdUninstall(home string) error {
+	return cmdUninstallWith(home, os.Args[1:], os.Stdin)
+}
+
+func cmdUninstallWith(home string, args []string, stdin io.Reader) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("locate binary: %w", err)
@@ -156,23 +162,48 @@ func cmdUninstall(home string) error {
 		exe = real
 	}
 	dir := filepath.Join(home, settingsDir)
-	fmt.Printf("This will remove:\n  service unit\n  %s\n  %s\nContinue? [y/N]: ", exe, dir)
-	r := bufio.NewReader(os.Stdin)
-	line, _ := r.ReadString('\n')
-	if !strings.EqualFold(strings.TrimSpace(line), "y") {
-		fmt.Println("supervaisor: aborted")
-		return nil
+
+	assumeYes := false
+	for _, a := range args {
+		if a == "-y" || a == "--yes" {
+			assumeYes = true
+		}
 	}
-	// Best-effort: tolerate "not installed" so uninstall is idempotent.
+
+	if !assumeYes {
+		fmt.Printf("This will remove:\n  service unit\n  %s\n  %s\nContinue? [y/N]: ", exe, dir)
+		r := bufio.NewReader(stdin)
+		line, _ := r.ReadString('\n')
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "y", "yes":
+			// ok
+		default:
+			fmt.Println("supervaisor: aborted")
+			return nil
+		}
+	}
+
+	// Best-effort: tolerate "not installed" so uninstall is idempotent. We
+	// still surface the error so the operator can see what happened.
+	fmt.Println("supervaisor: removing service unit…")
 	if svc, err := newService(); err == nil {
-		_ = svc.uninstall(home)
+		if err := svc.uninstall(home); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "supervaisor: service uninstall warning: %v\n", err)
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "supervaisor: service backend unavailable: %v\n", err)
 	}
+
+	fmt.Printf("supervaisor: removing %s\n", dir)
 	if err := os.RemoveAll(dir); err != nil {
 		return fmt.Errorf("remove %s: %w", dir, err)
 	}
+
+	fmt.Printf("supervaisor: removing %s\n", exe)
 	if err := os.Remove(exe); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove binary: %w", err)
 	}
+
 	fmt.Println("supervaisor: uninstalled")
 	return nil
 }
@@ -253,17 +284,44 @@ func (l *launchd) uninstall(home string) error {
 }
 
 func (l *launchd) start() error {
-	return run("launchctl", "kickstart", launchdTarget())
+	// If already loaded, kickstart is enough; otherwise re-bootstrap from
+	// the plist on disk. Stop uses `bootout`, so a previous stop leaves the
+	// agent unloaded and kickstart would fail with "Could not find service".
+	if err := run("launchctl", "kickstart", launchdTarget()); err == nil {
+		return nil
+	}
+	path := launchdPlistPath(homeForLaunchd())
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("service not installed (no plist at %s)", path)
+	}
+	return run("launchctl", "bootstrap", launchdDomain(), path)
 }
 
 func (l *launchd) stop() error {
-	// kill -SIGTERM via launchctl; KeepAlive would relaunch on real `stop`,
-	// so use kill which preserves the "managed but currently dead" state.
-	return run("launchctl", "kill", "SIGTERM", launchdTarget())
+	// KeepAlive=true means `launchctl kill SIGTERM` is racy — launchd
+	// respawns the process within milliseconds. The only reliable stop is
+	// `bootout`, which unloads the agent and kills the worker. `start`
+	// re-bootstraps from the on-disk plist.
+	return run("launchctl", "bootout", launchdTarget())
 }
 
 func (l *launchd) restart() error {
-	return run("launchctl", "kickstart", "-k", launchdTarget())
+	// kickstart -k SIGKILLs the worker; launchd respawns it under
+	// KeepAlive. Falls back to bootout+bootstrap if the agent isn't loaded.
+	if err := run("launchctl", "kickstart", "-k", launchdTarget()); err == nil {
+		return nil
+	}
+	return l.start()
+}
+
+// homeForLaunchd returns the HOME used to locate the plist. Service commands
+// run interactively in the user's shell, so $HOME is correct; centralizing
+// the lookup keeps start/stop/restart consistent with install/uninstall.
+func homeForLaunchd() string {
+	if h, err := os.UserHomeDir(); err == nil {
+		return h
+	}
+	return os.Getenv("HOME")
 }
 
 func (l *launchd) status() (string, error) {
