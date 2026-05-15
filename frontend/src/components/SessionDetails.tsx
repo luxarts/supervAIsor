@@ -81,11 +81,14 @@ export function SessionDetails({
     };
   }, [sessionId, hostname, lastEventAt, backendHttpBase]);
 
-  // Auto-revert confirmation after 5s.
+  // Esc key closes the confirmation modal.
   useEffect(() => {
     if (deleteState.phase !== "confirming") return;
-    const t = setTimeout(() => setDeleteState({ phase: "idle" }), 5000);
-    return () => clearTimeout(t);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDeleteState({ phase: "idle" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [deleteState]);
 
   if (error) {
@@ -107,28 +110,26 @@ export function SessionDetails({
   const breakdown = Object.entries(stats.tool_breakdown).sort((a, b) => b[1] - a[1]);
   const maxTool = breakdown.reduce((m, [, v]) => Math.max(m, v), 0) || 1;
 
-  const onDeleteClick = async () => {
-    if (deleteState.phase === "idle") {
+  const openConfirm = () => {
+    if (deleteState.phase === "idle" || deleteState.phase === "error") {
       setDeleteState({ phase: "confirming" });
-      return;
-    }
-    if (deleteState.phase === "confirming") {
-      setDeleteState({ phase: "deleting" });
-      try {
-        await deleteSession(backendHttpBase, hostname, sessionId);
-        onDeleted?.();
-      } catch (e) {
-        setDeleteState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
-      }
     }
   };
 
+  const confirmDelete = async () => {
+    setDeleteState({ phase: "deleting" });
+    try {
+      await deleteSession(backendHttpBase, hostname, sessionId);
+      onDeleted?.();
+    } catch (e) {
+      setDeleteState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const cancelConfirm = () => setDeleteState({ phase: "idle" });
+
   const buttonLabel =
-    deleteState.phase === "deleting"
-      ? "DELETING…"
-      : deleteState.phase === "confirming"
-      ? "CONFIRM DELETE"
-      : "DELETE SESSION";
+    deleteState.phase === "deleting" ? "DELETING…" : "DELETE SESSION";
   const deleteDisabled =
     pollerOnline !== true || deleteState.phase === "deleting";
   const fullPath = stats?.project_dir_encoded
@@ -207,7 +208,7 @@ export function SessionDetails({
         )}
         <button
           type="button"
-          onClick={onDeleteClick}
+          onClick={openConfirm}
           disabled={deleteDisabled}
           aria-label="Delete session"
           title={pollerOnline ? "" : `Poller offline — start the poller on ${hostname} to enable`}
@@ -218,6 +219,70 @@ export function SessionDetails({
           {buttonLabel}
         </button>
       </Section>
+
+      {deleteState.phase === "confirming" && (
+        <ConfirmDeleteModal
+          path={fullPath}
+          onCancel={cancelConfirm}
+          onConfirm={confirmDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConfirmDeleteModal({
+  path,
+  onCancel,
+  onConfirm,
+}: {
+  path: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm delete"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div className="absolute inset-0 bg-black/80" />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 w-full max-w-md border border-rd bg-bg-panel p-5
+                   shadow-[0_0_30px_rgba(255,0,60,0.35)]"
+      >
+        <div className="font-hud text-base uppercase tracking-widest text-rd">
+          ARE YOU SURE TO DELETE?
+        </div>
+        <div className="mt-3 font-hud text-[11px] uppercase tracking-widest text-dim">
+          THIS WILL REMOVE THE FILE FROM DISK. THIS CANNOT BE UNDONE.
+        </div>
+        <div className="mt-3 break-all border border-dim/40 bg-black/40 p-2 font-mono text-xs text-txt">
+          {path}
+        </div>
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 border border-cy/40 px-3 py-2 font-hud text-xs uppercase
+                       tracking-widest text-cy hover:bg-cy/10 touch-manipulation min-h-[44px]"
+          >
+            CANCELAR
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            autoFocus
+            className="flex-1 border border-rd bg-rd/20 px-3 py-2 font-hud text-xs uppercase
+                       tracking-widest text-rd hover:bg-rd/40 touch-manipulation min-h-[44px]"
+          >
+            ELIMINAR
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

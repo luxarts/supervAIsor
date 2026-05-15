@@ -122,7 +122,7 @@ describe("SessionDetails", () => {
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("requires two clicks to delete and calls onDeleted on 204", async () => {
+  it("opens a confirm modal and deletes via ELIMINAR; cancels via CANCELAR", async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.method === "DELETE") {
         return { ok: true, status: 204, text: async () => "" };
@@ -144,9 +144,22 @@ describe("SessionDetails", () => {
     );
     await waitFor(() => expect(screen.getByText("claude-opus-4-7")).toBeTruthy());
     const btn = screen.getByRole("button", { name: /delete session/i });
-    fireEvent.click(btn); // → confirm state
-    expect(btn.textContent).toMatch(/confirm delete/i);
-    fireEvent.click(btn); // → actually deletes
+    fireEvent.click(btn);
+
+    // Confirm modal opens.
+    const modal = await screen.findByRole("dialog", { name: /confirm delete/i });
+    expect(modal.textContent).toMatch(/ARE YOU SURE TO DELETE\?/);
+
+    // CANCELAR returns to idle.
+    fireEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+    expect(screen.queryByRole("dialog", { name: /confirm delete/i })).toBeNull();
+    expect(onDeleted).not.toHaveBeenCalled();
+
+    // Reopen and confirm.
+    fireEvent.click(screen.getByRole("button", { name: /delete session/i }));
+    await screen.findByRole("dialog", { name: /confirm delete/i });
+    fireEvent.click(screen.getByRole("button", { name: /eliminar/i }));
+
     await waitFor(() => expect(onDeleted).toHaveBeenCalled());
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/sessions/mac-A/abc"),
