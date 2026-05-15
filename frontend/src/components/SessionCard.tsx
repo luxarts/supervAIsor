@@ -12,6 +12,7 @@ interface Props {
   notify?: boolean;
   errorActive?: boolean;
   flash?: "complete" | "error" | null;
+  pollerOnline?: boolean;
 }
 
 export function SessionCard({
@@ -21,6 +22,7 @@ export function SessionCard({
   notify = false,
   errorActive = false,
   flash = null,
+  pollerOnline,
 }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -86,6 +88,17 @@ export function SessionCard({
       <h2 className="mt-3 font-hud text-xl uppercase tracking-wider text-txt truncate">
         {session.name}
         <span className="text-yl mx-0.5">@</span>
+        {pollerOnline !== undefined && (
+          <span
+            data-testid="poller-led"
+            data-online={pollerOnline ? "true" : "false"}
+            title={pollerOnline ? "Poller online" : "Poller offline"}
+            className={`mx-1 inline-block h-2 w-2 rounded-full align-middle ${
+              pollerOnline ? "bg-[#32ff7e]" : "bg-rd"
+            }`}
+            aria-label={pollerOnline ? "Poller online" : "Poller offline"}
+          />
+        )}
         <span className="text-cy">{session.hostname}</span>
       </h2>
 

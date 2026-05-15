@@ -34,7 +34,7 @@ const isSortKey = (v: string | null): v is SortKey =>
 const FLASH_MS = 1200;
 
 export default function App() {
-  const { sessions, connected } = useSessionsSocket(WS_URL);
+  const { sessions, connected, pollersOnline } = useSessionsSocket(WS_URL);
 
   const [hideStale, setHideStale] = useState<boolean>(() => {
     const v = localStorage.getItem(HIDE_STALE_KEY);
@@ -185,6 +185,7 @@ export default function App() {
                 notify={notify.has(key)}
                 errorActive={errorActive.has(key)}
                 flash={flashes.get(key) ?? null}
+                pollerOnline={pollersOnline[s.hostname] ?? false}
               />
             );
           })}
