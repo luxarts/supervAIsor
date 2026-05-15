@@ -110,7 +110,7 @@ func TestGetSessionEvents(t *testing.T) {
 		Hostname:      "host-test",
 		Name:          "s",
 		Project:       "/tmp/p",
-		Status:        "idle",
+		Status:        state.StatusDone,
 		StartedAt:     now,
 		LastEventAt:   now,
 		CurrentAction: "",
