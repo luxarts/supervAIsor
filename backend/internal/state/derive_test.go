@@ -182,6 +182,79 @@ func TestRecomputeStatus_WorkingNotDowngraded(t *testing.T) {
 	}
 }
 
+func TestApply_ToolResultError_SetsLastErrorAt(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	prev := &Session{
+		ID:                "abc",
+		StartedAt:         now.Add(-1 * time.Minute),
+		LastEventAt:       now.Add(-10 * time.Second),
+		Status:            StatusWorking,
+		PendingToolUseIDs: map[string]struct{}{"tool_1": {}},
+	}
+	env := events.IngestEnvelope{
+		SessionID: "abc", ProjectDir: "-tmp",
+		FileMTime: now, LineIndex: 2,
+		Raw: mustRaw(t, map[string]any{
+			"type":      "user",
+			"timestamp": now,
+			"message": map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type":        "tool_result",
+						"tool_use_id": "tool_1",
+						"is_error":    true,
+					},
+				},
+			},
+		}),
+	}
+	got, err := Apply(prev, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.LastErrorAt.Equal(now) {
+		t.Errorf("LastErrorAt = %v, want %v", got.LastErrorAt, now)
+	}
+}
+
+func TestApply_ToolResultSuccess_PreservesLastErrorAt(t *testing.T) {
+	earlier := time.Date(2026, 5, 15, 9, 59, 0, 0, time.UTC)
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	prev := &Session{
+		ID:                "abc",
+		StartedAt:         earlier.Add(-1 * time.Minute),
+		LastEventAt:       earlier,
+		LastErrorAt:       earlier,
+		Status:            StatusWorking,
+		PendingToolUseIDs: map[string]struct{}{"tool_2": {}},
+	}
+	env := events.IngestEnvelope{
+		SessionID: "abc", ProjectDir: "-tmp",
+		FileMTime: now, LineIndex: 3,
+		Raw: mustRaw(t, map[string]any{
+			"type":      "user",
+			"timestamp": now,
+			"message": map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type":        "tool_result",
+						"tool_use_id": "tool_2",
+					},
+				},
+			},
+		}),
+	}
+	got, err := Apply(prev, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.LastErrorAt.Equal(earlier) {
+		t.Errorf("LastErrorAt = %v, want %v (success result must not clear)", got.LastErrorAt, earlier)
+	}
+}
+
 func TestApply_SetsHostnameOnFirstEvent(t *testing.T) {
 	now := time.Now().UTC()
 	env := events.IngestEnvelope{

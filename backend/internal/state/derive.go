@@ -63,7 +63,7 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 	case "assistant":
 		applyAssistant(&next, line)
 	case "user":
-		applyUser(&next, line)
+		applyUser(&next, line, ts)
 	}
 
 	RecomputeStatus(&next, ts)
@@ -93,7 +93,7 @@ func applyAssistant(s *Session, line events.RawLine) {
 	}
 }
 
-func applyUser(s *Session, line events.RawLine) {
+func applyUser(s *Session, line events.RawLine, ts time.Time) {
 	if line.Message == nil {
 		return
 	}
@@ -102,6 +102,9 @@ func applyUser(s *Session, line events.RawLine) {
 		if b.Type == "tool_result" {
 			sawToolResult = true
 			delete(s.PendingToolUseIDs, b.ToolUseID)
+			if b.IsError {
+				s.LastErrorAt = ts
+			}
 		}
 	}
 	if !sawToolResult {
