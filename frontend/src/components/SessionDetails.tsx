@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { isPinned, togglePin, subscribe as subscribePins } from "../lib/pins";
+import { isNotifyEnabled, toggleNotify, subscribeNotify } from "../lib/notify";
 
 interface Tokens {
   input: number;
@@ -36,6 +38,10 @@ interface Props {
 export function SessionDetails({ sessionId, hostname, lastEventAt, backendHttpBase }: Props) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const settingsKey = `${hostname}:${sessionId}`;
+  const pinned = useSyncExternalStore(subscribePins, () => isPinned(settingsKey));
+  const notify = useSyncExternalStore(subscribeNotify, () => isNotifyEnabled(settingsKey));
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +123,28 @@ export function SessionDetails({ sessionId, hostname, lastEventAt, backendHttpBa
           </div>
         ))}
       </Section>
+
+      <Section title="SETTINGS">
+        <SwitchRow
+          label="📌 Pin to top"
+          checked={pinned}
+          onChange={() => togglePin(settingsKey)}
+        />
+        <SwitchRow
+          label="🔔 Notify on turn complete"
+          checked={notify}
+          onChange={() => {
+            // First-time enable triggers Notification permission prompt
+            // (best-effort; failure is silently swallowed).
+            if (!notify && typeof window !== "undefined" && "Notification" in window) {
+              if (Notification.permission === "default") {
+                Notification.requestPermission().catch(() => {});
+              }
+            }
+            toggleNotify(settingsKey);
+          }}
+        />
+      </Section>
     </div>
   );
 }
@@ -137,6 +165,37 @@ function Row({ k, v }: { k: string; v: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-dim">{k}</span>
       <span className="text-txt break-all text-right">{v}</span>
+    </div>
+  );
+}
+
+function SwitchRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-txt">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-label={label}
+        aria-checked={checked}
+        onClick={onChange}
+        className={`h-6 w-12 border touch-manipulation transition-colors
+                    ${checked ? "border-cy bg-cy/30" : "border-cy/30 bg-bg-panel"}`}
+      >
+        <span
+          aria-hidden
+          className={`block h-full w-1/2 transition-transform
+                      ${checked ? "translate-x-full bg-cy" : "translate-x-0 bg-dim"}`}
+        />
+      </button>
     </div>
   );
 }

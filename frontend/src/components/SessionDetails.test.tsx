@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent } from "@testing-library/react";
 import { SessionDetails } from "./SessionDetails";
+import { isPinned } from "../lib/pins";
+import { isNotifyEnabled } from "../lib/notify";
 
 const stats = {
   hostname: "mac-A",
@@ -66,5 +69,41 @@ describe("SessionDetails", () => {
       />,
     );
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  });
+
+  it("toggles pin via the SETTINGS switch and persists to storage", async () => {
+    localStorage.clear();
+    render(
+      <SessionDetails
+        sessionId="abc"
+        hostname="mac-A"
+        lastEventAt="2026-05-14T10:00:00Z"
+        backendHttpBase="http://localhost:8080"
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("claude-opus-4-7")).toBeTruthy());
+
+    const pinSwitch = screen.getByRole("switch", { name: /pin to top/i });
+    expect(pinSwitch.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(pinSwitch);
+    expect(pinSwitch.getAttribute("aria-checked")).toBe("true");
+    expect(isPinned("mac-A:abc")).toBe(true);
+  });
+
+  it("toggles notify via the SETTINGS switch and persists to storage", async () => {
+    localStorage.clear();
+    render(
+      <SessionDetails
+        sessionId="abc"
+        hostname="mac-A"
+        lastEventAt="2026-05-14T10:00:00Z"
+        backendHttpBase="http://localhost:8080"
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("claude-opus-4-7")).toBeTruthy());
+
+    const notifySwitch = screen.getByRole("switch", { name: /notify on turn complete/i });
+    fireEvent.click(notifySwitch);
+    expect(isNotifyEnabled("mac-A:abc")).toBe(true);
   });
 });
