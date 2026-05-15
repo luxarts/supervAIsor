@@ -123,7 +123,7 @@ describe("SessionDetails", () => {
   });
 
   it("requires two clicks to delete and calls onDeleted on 204", async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.method === "DELETE") {
         return { ok: true, status: 204, text: async () => "" };
       }
