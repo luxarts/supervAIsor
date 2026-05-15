@@ -196,6 +196,24 @@ func (s *SQLite) AppendEvent(ctx context.Context, hostname, sessionID string, ts
 // New code should use events.Event directly.
 type Event = events.Event
 
+// DeleteSession removes a session row and all its events in a single
+// transaction. No-op when the session does not exist.
+func (s *SQLite) DeleteSession(ctx context.Context, hostname, id string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM events WHERE hostname = ? AND session_id = ?`, hostname, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE hostname = ? AND id = ?`, hostname, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
 // ListEvents returns the most recent events for a session, in chronological
 // (ts ASC) order, capped at limit. When the session has more events than
 // limit, the older ones are dropped so the modal always shows the tail of

@@ -265,3 +265,53 @@ func TestUpsertSession_SameIDDifferentHosts(t *testing.T) {
 		t.Errorf("rows did not isolate by hostname: A=%v B=%v", ga, gb)
 	}
 }
+
+func TestDeleteSession_RemovesSessionAndEvents(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "del.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:      state.StatusDone,
+		StartedAt:   t0,
+		LastEventAt: t0,
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AppendEvent(ctx, "h", "abc", t0, "user", []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AppendEvent(ctx, "h", "abc", t0, "assistant", []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := st.DeleteSession(ctx, "h", "abc"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := st.GetSession(ctx, "h", "abc")
+	if got != nil {
+		t.Errorf("session still present after delete: %+v", got)
+	}
+	evs, _ := st.ListEvents(ctx, "h", "abc", -1)
+	if len(evs) != 0 {
+		t.Errorf("events not purged: %d remain", len(evs))
+	}
+}
+
+func TestDeleteSession_NoOpOnMissing(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "del2.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.DeleteSession(context.Background(), "h", "missing"); err != nil {
+		t.Errorf("DeleteSession on missing should be no-op, got %v", err)
+	}
+}
