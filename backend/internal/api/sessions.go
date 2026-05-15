@@ -87,8 +87,8 @@ func (h *Handler) getSessionStats(c *gin.Context) {
 		return
 	}
 
-	// 100000 acts as "no limit" — full event log for accurate aggregates.
-	evs, err := h.Store.ListEvents(ctx, hostname, id, 100000)
+	// Pass -1 for unlimited so aggregates include the full event log.
+	evs, err := h.Store.ListEvents(ctx, hostname, id, -1)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

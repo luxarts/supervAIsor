@@ -172,7 +172,8 @@ type Event = events.Event
 // limit, the older ones are dropped so the modal always shows the tail of
 // the conversation.
 func (s *SQLite) ListEvents(ctx context.Context, hostname, sessionID string, limit int) ([]events.Event, error) {
-	if limit <= 0 {
+	// limit == 0 → use sane default; limit < 0 → unlimited (SQLite LIMIT -1).
+	if limit == 0 {
 		limit = 500
 	}
 	rows, err := s.db.QueryContext(ctx,

@@ -152,6 +152,30 @@ func TestAppendEvent_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestListEvents_NegativeLimitReturnsAll(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	mustAppend := func(offset time.Duration, typ, payload string) {
+		t.Helper()
+		if err := s.AppendEvent(ctx, "host-test", "sess-neg", now.Add(offset), typ, []byte(payload)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustAppend(0, "user", `{"n":1}`)
+	mustAppend(time.Second, "assistant", `{"n":2}`)
+	mustAppend(2*time.Second, "user", `{"n":3}`)
+
+	evs, err := s.ListEvents(ctx, "host-test", "sess-neg", -1)
+	if err != nil {
+		t.Fatalf("ListEvents with -1 failed: %v", err)
+	}
+	if len(evs) != 3 {
+		t.Errorf("got %d events with limit=-1, want 3 (all rows)", len(evs))
+	}
+}
+
 func TestUpsertSession_SameIDDifferentHosts(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
