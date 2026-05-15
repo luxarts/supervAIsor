@@ -64,20 +64,23 @@ describe("SessionCard", () => {
     expect(container.querySelector(".flash-error")).toBeTruthy();
   });
 
-  it("renders a green LED when pollerOnline is true", () => {
-    const { container } = render(
-      <SessionCard session={sess} onOpen={() => {}} pollerOnline />,
-    );
-    const led = container.querySelector('[data-testid="poller-led"]');
-    expect(led).toBeTruthy();
-    expect(led?.getAttribute("data-online")).toBe("true");
-  });
-
-  it("renders a red LED when pollerOnline is false", () => {
+  it("dims the card when pollerOnline is false", () => {
     const { container } = render(
       <SessionCard session={sess} onOpen={() => {}} pollerOnline={false} />,
     );
-    const led = container.querySelector('[data-testid="poller-led"]');
-    expect(led?.getAttribute("data-online")).toBe("false");
+    const btn = container.querySelector("button");
+    expect(btn?.getAttribute("data-poller-online")).toBe("false");
+    expect(btn?.className).toContain("opacity-50");
+    expect(btn?.className).toContain("grayscale");
+  });
+
+  it("renders normally when pollerOnline is true", () => {
+    const { container } = render(
+      <SessionCard session={sess} onOpen={() => {}} pollerOnline />,
+    );
+    const btn = container.querySelector("button");
+    expect(btn?.getAttribute("data-poller-online")).toBe("true");
+    expect(btn?.className).not.toContain("opacity-50");
+    expect(btn?.className).not.toContain("grayscale");
   });
 });

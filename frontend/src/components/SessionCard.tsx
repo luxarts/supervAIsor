@@ -45,15 +45,22 @@ export function SessionCard({
     session.status === "working" && !errorActive
       ? "shadow-[0_0_18px_rgba(0,240,255,0.25)]"
       : "";
+  // When the host poller is offline, dim the entire card so it visibly
+  // recedes — the user cannot delete it and any state on screen may be
+  // stale until the poller reconnects.
+  const offlineDim =
+    pollerOnline === false ? "opacity-50 grayscale" : "";
 
   return (
     <button
       type="button"
       onClick={onOpen}
+      data-poller-online={pollerOnline === false ? "false" : "true"}
+      title={pollerOnline === false ? `Poller offline on ${session.hostname}` : undefined}
       className={`relative min-h-[160px] w-full border bg-bg-panel p-4 text-left transition-colors
                   active:scale-[0.99] touch-manipulation
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cy
-                  ${borderColor} ${workingGlow} ${flashClass}`}
+                  ${borderColor} ${workingGlow} ${flashClass} ${offlineDim}`}
     >
       <header className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -88,17 +95,6 @@ export function SessionCard({
       <h2 className="mt-3 font-hud text-xl uppercase tracking-wider text-txt truncate">
         {session.name}
         <span className="text-yl mx-0.5">@</span>
-        {pollerOnline !== undefined && (
-          <span
-            data-testid="poller-led"
-            data-online={pollerOnline ? "true" : "false"}
-            title={pollerOnline ? "Poller online" : "Poller offline"}
-            className={`mx-1 inline-block h-2 w-2 rounded-full align-middle ${
-              pollerOnline ? "bg-[#32ff7e]" : "bg-rd"
-            }`}
-            aria-label={pollerOnline ? "Poller online" : "Poller offline"}
-          />
-        )}
         <span className="text-cy">{session.hostname}</span>
       </h2>
 
