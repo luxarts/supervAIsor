@@ -28,53 +28,85 @@ Backend and frontend run on a single machine. One or more pollers can run on dif
 
 ## Quickstart
 
-On the **server** machine (runs backend + frontend):
+There are two ways to run supervAIsor: **local dev** (fastest, runs everything on one machine without Docker) and **Docker** (production-style, what you'd deploy on a home server).
+
+### Option A — Local dev (recommended to try it out)
+
+Prereqs: Go ≥ 1.22, Node ≥ 20, npm.
+
+In three terminals, from the repo root:
 
 ```bash
-make up              # starts backend + frontend in Docker
-open http://localhost:5173
+# 1) backend on :8080
+cd backend && DB_PATH=/tmp/supervaisor.db go run ./cmd/server
+
+# 2) frontend on :5173 (proxies WS to :8080)
+cd frontend && npm install && npm run dev
+
+# 3) poller on the host (same machine here)
+make poller
 ```
 
-On every **monitored** machine (where Claude Code runs):
+Open <http://localhost:5173>. The poller will auto-write `~/.supervaisor/settings.json` with `backend: localhost:8080` on first run.
+
+### Option B — Docker (backend + frontend in containers)
+
+Prereqs: Docker, and an external Docker network named `traefik_default` with a Traefik instance routing `/supervaisor` to the stack. The compose file does **not** publish host ports — it's designed to sit behind Traefik.
+
+```bash
+make up      # docker compose up backend + frontend
+make logs    # tail logs
+make down    # stop
+```
+
+Then visit `http://<your-traefik-host>/supervaisor`. If you don't have Traefik, use Option A or edit `infrastructure/docker-compose.yml` to add `ports:` mappings (`8080:8080` for backend, `80:80` for frontend) and remove the Traefik labels.
+
+### Installing the poller on each monitored machine
+
+On every machine where Claude Code runs, install the poller as a background service:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luxarts/supervAIsor/main/install.sh | bash
 ```
 
 The installer:
-1. Downloads the latest poller binary into `~/.local/bin/supervaisor`.
-2. Prompts you for the backend (e.g. `localhost:8080` or `dashboard.local/supervaisor`).
+1. Downloads the latest poller binary to `~/.local/bin/supervaisor`.
+2. Prompts for the backend (e.g. `192.168.1.10:8080` or `dashboard.local/supervaisor`).
 3. Writes `~/.supervaisor/settings.json`.
-4. Calls `supervaisor install` — registers a native background service (launchd on macOS, systemd `--user` on Linux), auto-starting at login and restarting on crash.
+4. Calls `supervaisor install` — registers a native service (launchd on macOS, systemd `--user` on Linux) that auto-starts at login and restarts on crash.
 
-Skip the prompt with `SUPERVAISOR_BACKEND=... bash install.sh`.
+Skip the prompt non-interactively:
 
-Service commands (assumes `~/.local/bin` is in your `PATH`):
+```bash
+SUPERVAISOR_BACKEND=192.168.1.10:8080 bash install.sh
+```
+
+Make sure `~/.local/bin` is on your `PATH`. Then:
 
 ```bash
 supervaisor status      # report service state
 supervaisor start       # start the service
 supervaisor stop        # stop the service
-supervaisor restart     # restart the service
+supervaisor restart     # restart the service (use this after editing settings.json)
 supervaisor install     # (re)register the unit file and start
 supervaisor uninstall   # stop, remove unit + binary + ~/.supervaisor/ (asks for confirmation)
 supervaisor             # foreground mode (for debugging)
 ```
 
-The service writes logs to `~/.supervaisor/poller.log`. There is no PID file — the OS service manager owns process supervision.
+Logs go to `~/.supervaisor/poller.log`. The OS service manager owns process supervision — there is no PID file.
 
-To use it from your phone, point your browser at `http://<your-server-lan-ip>:5173`.
+To use the dashboard from your phone, point its browser at `http://<server-lan-ip>:5173` (dev) or `http://<server-lan-ip>/supervaisor` (Docker + Traefik).
 
-## Installing the poller manually
+### Building the poller from source
 
-If you'd rather build from source on the same machine as the backend:
+If you'd rather not curl the install script:
 
 ```bash
 make poller-build    # produces poller/supervaisor
-./poller/supervaisor # foreground
+./poller/supervaisor # run in foreground
 ```
 
-Both paths read settings from `~/.supervaisor/settings.json`, which the binary materializes with defaults on first run if it's missing.
+The binary materializes `~/.supervaisor/settings.json` with sensible defaults on first run.
 
 ## Make targets
 
@@ -130,7 +162,7 @@ Examples of `backend`:
 | `10.0.0.5:8080`             | `ws://10.0.0.5:8080/ws/ingest`                 |
 | `dashboard.local/supervaisor`   | `ws://dashboard.local/supervaisor/ws/ingest`       |
 
-After editing settings, restart the poller (`kill $(cat ~/.supervaisor/poller.pid) && bash <(curl -fsSL https://raw.githubusercontent.com/luxarts/supervAIsor/main/install.sh)` re-launches with the new values; or run the binary manually).
+After editing settings, restart the poller with `supervaisor restart` (or re-run the binary if you're using the foreground/manual path).
 
 No auth — this is a single-user, local-network-only instance.
 
