@@ -39,7 +39,15 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 	if p := DecodeProjectDir(env.ProjectDir); p != "" {
 		next.Project = p
 	}
-	if env.ProjectDir != "" {
+	// ProjectDirEncoded must hold the on-disk directory name (the
+	// "-Users-x-Projects-foo" form), which is what the poller needs to
+	// construct the JSONL path for delete. Prefer the explicit Raw field
+	// from new pollers; fall back to ProjectDir for backward compat when
+	// it doesn't look like a resolved absolute path.
+	switch {
+	case env.ProjectDirRaw != "":
+		next.ProjectDirEncoded = env.ProjectDirRaw
+	case env.ProjectDir != "" && !strings.HasPrefix(env.ProjectDir, "/"):
 		next.ProjectDirEncoded = env.ProjectDir
 	}
 

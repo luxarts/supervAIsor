@@ -6,13 +6,21 @@ import (
 )
 
 // IngestEnvelope is one message the poller sends over /ws/ingest.
+//
+// ProjectDir is the resolved filesystem path (e.g. /Users/x/Projects/foo)
+// that the poller smart-decoded from Claude's encoded directory name,
+// using the host filesystem to disambiguate names containing "-".
+// ProjectDirRaw is the on-disk directory name (e.g. -Users-x-Projects-foo)
+// — the source of truth for filesystem operations like delete. New pollers
+// always populate both; older pollers only send ProjectDir.
 type IngestEnvelope struct {
-	Hostname   string          `json:"hostname"`
-	SessionID  string          `json:"session_id"`
-	ProjectDir string          `json:"project_dir"`
-	FileMTime  time.Time       `json:"file_mtime"`
-	LineIndex  int             `json:"line_index"`
-	Raw        json.RawMessage `json:"raw"`
+	Hostname      string          `json:"hostname"`
+	SessionID     string          `json:"session_id"`
+	ProjectDir    string          `json:"project_dir"`
+	ProjectDirRaw string          `json:"project_dir_raw,omitempty"`
+	FileMTime     time.Time       `json:"file_mtime"`
+	LineIndex     int             `json:"line_index"`
+	Raw           json.RawMessage `json:"raw"`
 }
 
 // RawLine is the parsed shape of a JSONL line; we only model the fields
