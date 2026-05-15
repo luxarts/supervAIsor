@@ -1,25 +1,41 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
 
-func emptyEnv(string) string { return "" }
-
-func envFromMap(m map[string]string) func(string) string {
-	return func(k string) string { return m[k] }
-}
-
-func TestResolveBackendURL_DerivesFromHostPort(t *testing.T) {
-	got := resolveBackendURL(Config{BackendHost: "10.0.0.5", BackendPort: 9000})
-	want := "ws://10.0.0.5:9000/ws/ingest"
+func TestResolveBackendURL_HostPort(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "localhost:8080"})
+	want := "ws://localhost:8080/ws/ingest"
 	if got != want {
 		t.Errorf("got %q want %q", got, want)
 	}
 }
 
-func TestResolveBackendURL_RespectsOverride(t *testing.T) {
-	got := resolveBackendURL(Config{BackendURL: "ws://custom/path", BackendHost: "x", BackendPort: 1})
-	if got != "ws://custom/path" {
-		t.Errorf("override ignored: got %q", got)
+func TestResolveBackendURL_HostWithPath(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "mmm4p.local/supervaisor"})
+	want := "ws://mmm4p.local/supervaisor/ws/ingest"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveBackendURL_TrailingSlashTolerated(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "mmm4p.local/supervaisor/"})
+	want := "ws://mmm4p.local/supervaisor/ws/ingest"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveBackendURL_AlreadyHasIngestSuffix(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "host:1/ws/ingest"})
+	want := "ws://host:1/ws/ingest"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
 	}
 }
 
@@ -33,69 +49,89 @@ func TestResolveHostname_ExplicitWins(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_Defaults(t *testing.T) {
-	c, err := loadConfig(nil, emptyEnv)
+func TestLoadConfig_FirstRunWritesDefaults(t *testing.T) {
+	home := t.TempDir()
+	c, err := loadConfig(home)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.BackendHost != "localhost" || c.BackendPort != 8080 {
+	if c.Backend != "localhost:8080" {
 		t.Errorf("bad defaults: %#v", c)
 	}
+	if c.Interval != time.Second {
+		t.Errorf("default interval: %v", c.Interval)
+	}
+	if _, err := os.Stat(settingsPath(home)); err != nil {
+		t.Fatalf("expected settings file at %s: %v", settingsPath(home), err)
+	}
+	if c.StateFile != filepath.Join(home, ".supervaisor", "state.json") {
+		t.Errorf("state file path: %q", c.StateFile)
+	}
 }
 
-func TestLoadConfig_FlagsApplied(t *testing.T) {
-	c, err := loadConfig([]string{"-backend-host", "1.2.3.4", "-backend-port", "9999", "-hostname", "mac-A"}, emptyEnv)
+func TestLoadConfig_ReadsExistingFile(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".supervaisor"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{
+	  "backend": "mmm4p.local/supervaisor",
+	  "hostname": "from-file",
+	  "interval": "500ms"
+	}`
+	if err := os.WriteFile(settingsPath(home), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := loadConfig(home)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.BackendHost != "1.2.3.4" || c.BackendPort != 9999 || c.Hostname != "mac-A" {
-		t.Errorf("flags not applied: %#v", c)
+	if c.Backend != "mmm4p.local/supervaisor" || c.Hostname != "from-file" {
+		t.Errorf("file not applied: %#v", c)
 	}
-}
-
-func TestLoadConfig_EnvApplied(t *testing.T) {
-	env := envFromMap(map[string]string{
-		"SUPERVAISOR_BACKEND_HOST": "5.6.7.8",
-		"SUPERVAISOR_BACKEND_PORT": "1234",
-		"SUPERVAISOR_HOSTNAME":     "from-env",
-		"SUPERVAISOR_INTERVAL":     "500ms",
-		"SUPERVAISOR_BACKEND_URL":  "ws://env/ws/ingest",
-	})
-	c, err := loadConfig(nil, env)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.BackendHost != "5.6.7.8" || c.BackendPort != 1234 || c.Hostname != "from-env" {
-		t.Errorf("env not applied: %#v", c)
-	}
-	if c.Interval != 500_000_000 { // 500ms in ns
+	if c.Interval != 500*time.Millisecond {
 		t.Errorf("interval not parsed: %v", c.Interval)
 	}
-	if c.BackendURL != "ws://env/ws/ingest" {
-		t.Errorf("BackendURL = %q", c.BackendURL)
-	}
 }
 
-func TestLoadConfig_FlagOverridesEnv(t *testing.T) {
-	env := envFromMap(map[string]string{
-		"SUPERVAISOR_BACKEND_HOST": "from-env",
-		"SUPERVAISOR_HOSTNAME":     "host-from-env",
-	})
-	c, err := loadConfig([]string{"-backend-host", "from-flag", "-hostname", "host-from-flag"}, env)
+func TestLoadConfig_PartialFileKeepsDefaults(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".supervaisor"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settingsPath(home), []byte(`{"hostname":"mac-A"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := loadConfig(home)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.BackendHost != "from-flag" {
-		t.Errorf("flag did not override env: BackendHost = %q", c.BackendHost)
+	if c.Hostname != "mac-A" {
+		t.Errorf("hostname: %q", c.Hostname)
 	}
-	if c.Hostname != "host-from-flag" {
-		t.Errorf("flag did not override env: Hostname = %q", c.Hostname)
+	if c.Backend != "localhost:8080" {
+		t.Errorf("defaults clobbered by partial file: %#v", c)
 	}
 }
 
-func TestLoadConfig_InvalidPortEnv(t *testing.T) {
-	env := envFromMap(map[string]string{"SUPERVAISOR_BACKEND_PORT": "not-a-number"})
-	if _, err := loadConfig(nil, env); err == nil {
-		t.Fatal("expected error for invalid port")
+func TestLoadConfig_InvalidIntervalInFile(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".supervaisor"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settingsPath(home), []byte(`{"interval":"not-a-duration"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadConfig(home); err == nil {
+		t.Fatal("expected error for invalid interval")
+	}
+}
+
+func TestPaths_UseHomeDotSupervaisor(t *testing.T) {
+	if got := settingsPath("/home/u"); got != "/home/u/.supervaisor/settings.json" {
+		t.Errorf("settings path: %q", got)
+	}
+	if got := statePath("/home/u"); got != "/home/u/.supervaisor/state.json" {
+		t.Errorf("state path: %q", got)
 	}
 }

@@ -3,13 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,80 +18,16 @@ import (
 	"github.com/luxarts/supervaisor-poller/internal/wsclient"
 )
 
-type Config struct {
-	ProjectsDir string
-	StateFile   string
-	BackendHost string
-	BackendPort int
-	BackendURL  string
-	Hostname    string
-	Interval    time.Duration
-}
-
-// loadConfig resolves configuration in precedence order: flag > env > default.
-// Env vars are prefixed with SUPERVAISOR_, e.g. SUPERVAISOR_BACKEND_HOST.
-func loadConfig(args []string, getenv func(string) string) (Config, error) {
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-	home, _ := os.UserHomeDir()
-	c := Config{
-		ProjectsDir: filepath.Join(home, ".claude", "projects"),
-		StateFile:   filepath.Join(home, ".supervAIsor", "poller-state.json"),
-		BackendHost: "localhost",
-		BackendPort: 8080,
-		Interval:    time.Second,
-	}
-
-	if v := getenv("SUPERVAISOR_PROJECTS_DIR"); v != "" {
-		c.ProjectsDir = v
-	}
-	if v := getenv("SUPERVAISOR_STATE_FILE"); v != "" {
-		c.StateFile = v
-	}
-	if v := getenv("SUPERVAISOR_BACKEND_HOST"); v != "" {
-		c.BackendHost = v
-	}
-	if v := getenv("SUPERVAISOR_BACKEND_PORT"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			return c, fmt.Errorf("SUPERVAISOR_BACKEND_PORT: %w", err)
-		}
-		c.BackendPort = n
-	}
-	if v := getenv("SUPERVAISOR_BACKEND_URL"); v != "" {
-		c.BackendURL = v
-	}
-	if v := getenv("SUPERVAISOR_HOSTNAME"); v != "" {
-		c.Hostname = v
-	}
-	if v := getenv("SUPERVAISOR_INTERVAL"); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil {
-			return c, fmt.Errorf("SUPERVAISOR_INTERVAL: %w", err)
-		}
-		c.Interval = d
-	}
-
-	fs := flag.NewFlagSet("poller", flag.ContinueOnError)
-	fs.StringVar(&c.ProjectsDir, "projects-dir", c.ProjectsDir, "Claude projects dir (env: SUPERVAISOR_PROJECTS_DIR)")
-	fs.StringVar(&c.StateFile, "state-file", c.StateFile, "Offset state file (env: SUPERVAISOR_STATE_FILE)")
-	fs.StringVar(&c.BackendHost, "backend-host", c.BackendHost, "Backend host (env: SUPERVAISOR_BACKEND_HOST)")
-	fs.IntVar(&c.BackendPort, "backend-port", c.BackendPort, "Backend port (env: SUPERVAISOR_BACKEND_PORT)")
-	fs.StringVar(&c.BackendURL, "backend", c.BackendURL, "Backend WS URL, overrides host+port (env: SUPERVAISOR_BACKEND_URL)")
-	fs.StringVar(&c.Hostname, "hostname", c.Hostname, "Hostname tag, default: OS hostname with .local stripped (env: SUPERVAISOR_HOSTNAME)")
-	fs.DurationVar(&c.Interval, "interval", c.Interval, "Poll interval (env: SUPERVAISOR_INTERVAL)")
-	if err := fs.Parse(args); err != nil {
-		return c, err
-	}
-	return c, nil
-}
-
+// resolveBackendURL turns the user-facing "host:port/path" form into a full
+// WS URL. The scheme is fixed (ws://) and "/ws/ingest" is appended if the
+// configured value doesn't already end with it, so both "localhost:8080" and
+// "mmm4p.local/supervaisor" yield the right endpoint.
 func resolveBackendURL(c Config) string {
-	if c.BackendURL != "" {
-		return c.BackendURL
+	b := strings.TrimSuffix(c.Backend, "/")
+	if !strings.HasSuffix(b, "/ws/ingest") {
+		b += "/ws/ingest"
 	}
-	return fmt.Sprintf("ws://%s:%d/ws/ingest", c.BackendHost, c.BackendPort)
+	return "ws://" + b
 }
 
 func resolveHostname(c Config) (string, error) {
@@ -108,7 +42,11 @@ func resolveHostname(c Config) (string, error) {
 }
 
 func main() {
-	cfg, err := loadConfig(os.Args[1:], os.Getenv)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("resolve home dir: %v", err)
+	}
+	cfg, err := loadConfig(home)
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}

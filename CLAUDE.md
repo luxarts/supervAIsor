@@ -18,7 +18,7 @@ poller (mac C) ──ws──┘   └─ SQLite (volume)
 
 Three processes:
 
-- **`poller/`** — host-native Go binary. Tails `~/.claude/projects/*/*.jsonl`, persists per-file read offsets in `~/.supervAIsor/poller-state.json`, ships envelopes over `ws://backend/ws/ingest`. Must run on the host (not in a container) for filesystem access. Each poller stamps every envelope with its `hostname`; multiple pollers on different machines can target the same backend concurrently.
+- **`poller/`** — host-native Go binary. Tails `~/.claude/projects/*/*.jsonl`, persists per-file read offsets in `~/.supervaisor/state.json`, ships envelopes over `ws://backend/ws/ingest`. Reads runtime settings from `~/.supervaisor/settings.json`, which it materializes with defaults on first run. Must run on the host (not in a container) for filesystem access. Each poller stamps every envelope with its `hostname`; multiple pollers on different machines can target the same backend concurrently.
 - **`backend/`** — Go (Gin + gorilla/websocket). Endpoints: `GET /healthz`, `GET /sessions`, `GET /sessions/:hostname/:id/events`, `GET /sessions/:hostname/:id/stats`, `DELETE /sessions/:hostname/:id`, `WS /ws/ingest` (multi-writer, bidirectional — accepts envelopes and dispatches `delete` commands), `WS /ws/clients` (fan-out for session updates, poller liveness, and removal events). Pure state derivation lives in `internal/state/`. Persistence via SQLite (`modernc.org/sqlite`, no CGO) with WAL + `busy_timeout` to tolerate concurrent writers. Sessions are keyed by composite `(hostname, session_id)`.
 - **`frontend/`** — React 19 + Vite + TypeScript + Tailwind. Cyberpunk 2077 palette (cyan `#00f0ff`, yellow `#fcee0a`, red `#ff003c` on black). Mobile-first; cards ≥160 px; touch targets ≥44 px. Cards render `name@hostname` with the `@` and hostname color-separated for legibility. The conversation modal live-refreshes whenever the underlying session ticks forward (via the WS-driven `last_event_at` prop).
 
@@ -58,9 +58,19 @@ cd poller
 go run ./cmd/poller   # or: make poller-install && supervaisor-poller
 ```
 
-Flags: `-projects-dir`, `-state-file`, `-backend-host`, `-backend-port`, `-backend` (full WS URL override), `-hostname`, `-interval`.
+No flags, no env vars. The poller reads every setting from `~/.supervaisor/settings.json`. On first run it writes the defaults to disk so the operator has a file to edit:
 
-Env vars (override defaults; flags still take precedence over env): `SUPERVAISOR_PROJECTS_DIR`, `SUPERVAISOR_STATE_FILE`, `SUPERVAISOR_BACKEND_HOST`, `SUPERVAISOR_BACKEND_PORT`, `SUPERVAISOR_BACKEND_URL`, `SUPERVAISOR_HOSTNAME`, `SUPERVAISOR_INTERVAL`. Example: `SUPERVAISOR_BACKEND_HOST=10.0.0.5 SUPERVAISOR_HOSTNAME=mac-A make poller`.
+```json
+{
+  "projects_dir": "/Users/you/.claude/projects",
+  "state_file":   "/Users/you/.supervaisor/state.json",
+  "backend":      "localhost:8080",
+  "hostname":     "",
+  "interval":     "1s"
+}
+```
+
+`backend` is `host[:port][/path]` (no scheme). The poller prepends `ws://` and appends `/ws/ingest`. Examples: `localhost:8080` → `ws://localhost:8080/ws/ingest`, `mmm4p.local/supervaisor` → `ws://mmm4p.local/supervaisor/ws/ingest`.
 
 `-hostname` defaults to the OS hostname with a trailing `.local` stripped (macOS-friendly). Multiple pollers on different machines can target the same backend concurrently.
 
