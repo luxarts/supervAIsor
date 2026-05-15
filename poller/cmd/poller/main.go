@@ -46,6 +46,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("resolve home dir: %v", err)
 	}
+	if dispatch(os.Args[1:], home) {
+		return
+	}
 	cfg, err := loadConfig(home)
 	if err != nil {
 		log.Fatalf("config: %v", err)

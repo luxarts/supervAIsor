@@ -17,8 +17,6 @@ BIN_NAME="supervaisor"
 INSTALL_DIR="${HOME}/.local/bin"
 CONFIG_DIR="${HOME}/.supervaisor"
 SETTINGS_FILE="${CONFIG_DIR}/settings.json"
-LOG_FILE="${CONFIG_DIR}/poller.log"
-PID_FILE="${CONFIG_DIR}/poller.pid"
 
 log() { printf '\033[36m›\033[0m %s\n' "$*"; }
 die() { printf '\033[31m✖\033[0m %s\n' "$*" >&2; exit 1; }
@@ -81,34 +79,11 @@ EOF
   log "Wrote ${SETTINGS_FILE}"
 }
 
-stop_existing() {
-  [ -f "$PID_FILE" ] || return 0
-  local pid
-  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-    log "Stopping previous poller (pid $pid)…"
-    kill "$pid" 2>/dev/null || true
-    # Give it a beat to exit cleanly.
-    for _ in 1 2 3 4 5; do
-      kill -0 "$pid" 2>/dev/null || break
-      sleep 0.2
-    done
-    kill -9 "$pid" 2>/dev/null || true
-  fi
-  rm -f "$PID_FILE"
-}
-
-start_background() {
-  stop_existing
-  log "Starting poller in background (logs: ${LOG_FILE})"
-  nohup "${INSTALL_DIR}/${BIN_NAME}" >>"$LOG_FILE" 2>&1 &
-  echo $! >"$PID_FILE"
-  disown 2>/dev/null || true
-  sleep 0.5
-  if ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-    die "Poller exited immediately. Tail of log:\n$(tail -n 20 "$LOG_FILE")"
-  fi
-  log "Running (pid $(cat "$PID_FILE"))"
+install_service() {
+  log "Installing background service…"
+  # The binary writes the native unit file (launchd on macOS, systemd --user
+  # on Linux) and starts it.
+  "${INSTALL_DIR}/${BIN_NAME}" install
 }
 
 main() {
@@ -119,18 +94,23 @@ main() {
   download_binary "$platform"
   backend="$(prompt_backend)"
   write_settings "$backend"
-  start_background
+  install_service
   cat <<EOF
 
 \033[32m✔\033[0m supervAIsor poller installed.
 
   Binary:   ${INSTALL_DIR}/${BIN_NAME}
   Settings: ${SETTINGS_FILE}
-  Logs:     ${LOG_FILE}
-  PID:      $(cat "$PID_FILE")
+  Logs:     ${CONFIG_DIR}/poller.log
 
-To stop:    kill \$(cat ${PID_FILE})
-To restart: bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh)
+Service commands (managed by $(uname -s | tr A-Z a-z | sed 's/darwin/launchd/;s/linux/systemd --user/')):
+  supervaisor status
+  supervaisor start
+  supervaisor stop
+  supervaisor restart
+  supervaisor uninstall
+
+Make sure ${INSTALL_DIR} is in your PATH.
 EOF
 }
 

@@ -41,7 +41,27 @@ On every **monitored** machine (where Claude Code runs):
 curl -fsSL https://raw.githubusercontent.com/luxarts/supervAIsor/main/install.sh | bash
 ```
 
-The installer downloads the latest poller binary, prompts you for the backend (e.g. `localhost:8080` or `mmm4p.local/supervaisor`), writes `~/.supervaisor/settings.json`, and launches the poller in the background. To skip the prompt, set `SUPERVAISOR_BACKEND=...` before piping.
+The installer:
+1. Downloads the latest poller binary into `~/.local/bin/supervaisor`.
+2. Prompts you for the backend (e.g. `localhost:8080` or `mmm4p.local/supervaisor`).
+3. Writes `~/.supervaisor/settings.json`.
+4. Calls `supervaisor install` — registers a native background service (launchd on macOS, systemd `--user` on Linux), auto-starting at login and restarting on crash.
+
+Skip the prompt with `SUPERVAISOR_BACKEND=... bash install.sh`.
+
+Service commands (assumes `~/.local/bin` is in your `PATH`):
+
+```bash
+supervaisor status      # report service state
+supervaisor start       # start the service
+supervaisor stop        # stop the service
+supervaisor restart     # restart the service
+supervaisor install     # (re)register the unit file and start
+supervaisor uninstall   # stop, remove unit + binary + ~/.supervaisor/ (asks for confirmation)
+supervaisor             # foreground mode (for debugging)
+```
+
+The service writes logs to `~/.supervaisor/poller.log`. There is no PID file — the OS service manager owns process supervision.
 
 To use it from your phone, point your browser at `http://<your-server-lan-ip>:5173`.
 
