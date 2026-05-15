@@ -36,19 +36,35 @@ type RawLine struct {
 // so callers can treat Content uniformly.
 type MessageContent struct {
 	Role    string         `json:"role,omitempty"`
+	Model   string         `json:"model,omitempty"`
+	Usage   *Usage         `json:"usage,omitempty"`
 	Content []ContentBlock `json:"content,omitempty"`
 }
 
-// UnmarshalJSON accepts either []ContentBlock or string for the content field.
+// Usage carries the token accounting fields Anthropic returns on
+// assistant messages. Any field may be zero/missing.
+type Usage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+}
+
+// UnmarshalJSON accepts either []ContentBlock or string for the content field
+// and additionally captures model + usage when present.
 func (m *MessageContent) UnmarshalJSON(data []byte) error {
 	var aux struct {
 		Role    string          `json:"role,omitempty"`
+		Model   string          `json:"model,omitempty"`
+		Usage   *Usage          `json:"usage,omitempty"`
 		Content json.RawMessage `json:"content,omitempty"`
 	}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	m.Role = aux.Role
+	m.Model = aux.Model
+	m.Usage = aux.Usage
 	if len(aux.Content) == 0 || string(aux.Content) == "null" {
 		m.Content = nil
 		return nil
@@ -73,4 +89,5 @@ type ContentBlock struct {
 	Input     json.RawMessage `json:"input,omitempty"`       // tool_use
 	ID        string          `json:"id,omitempty"`          // tool_use id
 	ToolUseID string          `json:"tool_use_id,omitempty"` // tool_result
+	IsError   bool            `json:"is_error,omitempty"`    // tool_result
 }
