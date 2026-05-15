@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useSessionsSocket } from "./useSessionsSocket";
 import { SessionCard } from "./components/SessionCard";
 import { ScanlineOverlay } from "./components/ScanlineOverlay";
@@ -99,15 +99,13 @@ export default function App() {
   });
 
   // Track error transitions: error flash overrides any in-flight completion flash.
+  // useErrorFlash already returns only the delta (newly-entered error-active keys),
+  // so we can fire directly without a second dedup layer.
   const { errorActive, freshErrors } = useErrorFlash(sessions);
-  const lastFreshKeysRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     for (const key of freshErrors) {
-      if (!lastFreshKeysRef.current.has(key)) {
-        fireFlash(key, "error");
-      }
+      fireFlash(key, "error");
     }
-    lastFreshKeysRef.current = new Set(freshErrors);
   }, [freshErrors]);
 
   // Counts visible to the user (computed from raw sessions, not the filtered view).
