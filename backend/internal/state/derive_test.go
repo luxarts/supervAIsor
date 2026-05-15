@@ -271,3 +271,23 @@ func TestApply_SetsHostnameOnFirstEvent(t *testing.T) {
 		t.Errorf("Hostname = %q, want mac-A", got.Hostname)
 	}
 }
+
+func TestApply_PropagatesProjectDirEncoded(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	env := events.IngestEnvelope{
+		Hostname: "h", SessionID: "abc",
+		ProjectDir: "-Users-x-Projects-foo",
+		FileMTime:  now,
+		Raw: mustRaw(t, map[string]any{
+			"type":      "user",
+			"timestamp": now,
+		}),
+	}
+	got, err := Apply(nil, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ProjectDirEncoded != "-Users-x-Projects-foo" {
+		t.Errorf("ProjectDirEncoded = %q, want -Users-x-Projects-foo", got.ProjectDirEncoded)
+	}
+}

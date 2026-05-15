@@ -21,7 +21,8 @@ type Session struct {
 	LastPromptAt  *time.Time `json:"last_prompt_at,omitempty"`
 	CurrentAction string     `json:"current_action"`
 	LastEventAt   time.Time  `json:"last_event_at"`
-	LastErrorAt   time.Time  `json:"last_error_at,omitempty"`
+	LastErrorAt       time.Time  `json:"last_error_at,omitempty"`
+	ProjectDirEncoded string     `json:"project_dir_encoded,omitempty"`
 
 	// Internal book-keeping not exposed in JSON.
 	PendingToolUseIDs map[string]struct{} `json:"-"`

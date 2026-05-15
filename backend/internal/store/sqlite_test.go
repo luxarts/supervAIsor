@@ -315,3 +315,30 @@ func TestDeleteSession_NoOpOnMissing(t *testing.T) {
 		t.Errorf("DeleteSession on missing should be no-op, got %v", err)
 	}
 }
+
+func TestUpsertSession_RoundTripsProjectDirEncoded(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "pde.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:            state.StatusDone,
+		StartedAt:         t0,
+		LastEventAt:       t0,
+		ProjectDirEncoded: "-Users-x-Projects-foo",
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetSession(ctx, "h", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ProjectDirEncoded != "-Users-x-Projects-foo" {
+		t.Errorf("ProjectDirEncoded = %q", got.ProjectDirEncoded)
+	}
+}

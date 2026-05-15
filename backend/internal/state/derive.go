@@ -39,6 +39,9 @@ func Apply(prev *Session, env events.IngestEnvelope) (*Session, error) {
 	if p := DecodeProjectDir(env.ProjectDir); p != "" {
 		next.Project = p
 	}
+	if env.ProjectDir != "" {
+		next.ProjectDirEncoded = env.ProjectDir
+	}
 
 	ts := env.FileMTime
 	if line.Timestamp != nil {

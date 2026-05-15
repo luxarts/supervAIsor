@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   current_action  TEXT,
   last_event_at   TIMESTAMP NOT NULL,
   last_error_at   TIMESTAMP,
+  project_dir_encoded TEXT,
   PRIMARY KEY (hostname, id)
 );
 CREATE TABLE IF NOT EXISTS events (
@@ -85,6 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_events_session_ts ON events(hostname, session_id,
 // so we tolerate the failure for the additive case.
 var migrations = []string{
 	`ALTER TABLE sessions ADD COLUMN last_error_at TIMESTAMP`,
+	`ALTER TABLE sessions ADD COLUMN project_dir_encoded TEXT`,
 }
 
 // UpsertSession inserts or updates a session record by primary key.
@@ -98,8 +100,8 @@ func (s *SQLite) UpsertSession(ctx context.Context, sess *state.Session) error {
 		lastError = sess.LastErrorAt
 	}
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO sessions (hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at)
-VALUES (?,?,?,?,?,?,?,?,?,?)
+INSERT INTO sessions (hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at, project_dir_encoded)
+VALUES (?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(hostname, id) DO UPDATE SET
   name=excluded.name,
   project=excluded.project,
@@ -108,10 +110,12 @@ ON CONFLICT(hostname, id) DO UPDATE SET
   last_prompt_at=excluded.last_prompt_at,
   current_action=excluded.current_action,
   last_event_at=excluded.last_event_at,
-  last_error_at=excluded.last_error_at
+  last_error_at=excluded.last_error_at,
+  project_dir_encoded=excluded.project_dir_encoded
 `,
 		sess.Hostname, sess.ID, sess.Name, sess.Project, string(sess.Status),
 		sess.StartedAt, lastPrompt, sess.CurrentAction, sess.LastEventAt, lastError,
+		sess.ProjectDirEncoded,
 	)
 	return err
 }
@@ -119,7 +123,7 @@ ON CONFLICT(hostname, id) DO UPDATE SET
 // ListSessions returns all sessions ordered by last_event_at descending.
 func (s *SQLite) ListSessions(ctx context.Context) ([]*state.Session, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at
+SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at, project_dir_encoded
 FROM sessions ORDER BY last_event_at DESC`)
 	if err != nil {
 		return nil, err
@@ -133,10 +137,11 @@ FROM sessions ORDER BY last_event_at DESC`)
 			status string
 			lp     sql.NullTime
 			le     sql.NullTime
+			pde    sql.NullString
 		)
 		if err := rows.Scan(
 			&sess.Hostname, &sess.ID, &sess.Name, &sess.Project, &status,
-			&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt, &le,
+			&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt, &le, &pde,
 		); err != nil {
 			return nil, err
 		}
@@ -148,6 +153,9 @@ FROM sessions ORDER BY last_event_at DESC`)
 		if le.Valid {
 			sess.LastErrorAt = le.Time
 		}
+		if pde.Valid {
+			sess.ProjectDirEncoded = pde.String
+		}
 		out = append(out, &sess)
 	}
 	return out, rows.Err()
@@ -156,16 +164,17 @@ FROM sessions ORDER BY last_event_at DESC`)
 // GetSession returns a session by (hostname, id), or nil if not found.
 func (s *SQLite) GetSession(ctx context.Context, hostname, id string) (*state.Session, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at
+SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at, project_dir_encoded
 FROM sessions WHERE hostname = ? AND id = ?`, hostname, id)
 	var (
 		sess   state.Session
 		status string
 		lp     sql.NullTime
 		le     sql.NullTime
+		pde    sql.NullString
 	)
 	err := row.Scan(&sess.Hostname, &sess.ID, &sess.Name, &sess.Project, &status,
-		&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt, &le)
+		&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt, &le, &pde)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -179,6 +188,9 @@ FROM sessions WHERE hostname = ? AND id = ?`, hostname, id)
 	}
 	if le.Valid {
 		sess.LastErrorAt = le.Time
+	}
+	if pde.Valid {
+		sess.ProjectDirEncoded = pde.String
 	}
 	return &sess, nil
 }
