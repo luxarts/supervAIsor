@@ -35,22 +35,35 @@ type Client struct {
 	// Implementations should be quick and either return nil (successful
 	// ack will be sent automatically) or an error (sent as the ack error).
 	OnCommand func(cmd Command) error
+
+	// OnConnect fires once per successful (re)connect, after the conn is
+	// installed and the lock released. Runs in its own goroutine so the
+	// callback may call Send safely. Use this to push a "hello" frame so
+	// the backend can mark the host online before the first event flows.
+	OnConnect func()
 }
 
 func New(url string) *Client { return &Client{url: url} }
 
 func (c *Client) Connect() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.conn != nil {
+		c.mu.Unlock()
 		return nil
 	}
 	conn, _, err := websocket.DefaultDialer.Dial(c.url, nil)
 	if err != nil {
+		c.mu.Unlock()
 		return err
 	}
 	c.conn = conn
+	onConnect := c.OnConnect
+	c.mu.Unlock()
 	log.Printf("wsclient: connected to %s", c.url)
+	if onConnect != nil {
+		// Run async so the callback can call Send without deadlocking on mu.
+		go onConnect()
+	}
 	return nil
 }
 

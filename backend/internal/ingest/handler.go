@@ -37,6 +37,7 @@ type updateFrame struct {
 // envelopeWithType is used to peek at the discriminator before full decode.
 type envelopeWithType struct {
 	Type      string `json:"type"`
+	Hostname  string `json:"hostname,omitempty"`
 	RequestID string `json:"request_id,omitempty"`
 	SessionID string `json:"session_id,omitempty"`
 	OK        bool   `json:"ok,omitempty"`
@@ -99,6 +100,15 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			log.Printf("ingest: delete_ack req=%s ok=%v err=%q", head.RequestID, head.OK, head.Error)
 			if h.Coordinator != nil {
 				h.Coordinator.Resolve(head.RequestID, head.OK, head.Error)
+			}
+			continue
+		}
+
+		if head.Type == "hello" {
+			if head.Hostname != "" && registeredHost == "" && h.Registry != nil {
+				h.Registry.Add(head.Hostname, writeCh)
+				registeredHost = head.Hostname
+				log.Printf("ingest: registered poller via hello hostname=%q", head.Hostname)
 			}
 			continue
 		}

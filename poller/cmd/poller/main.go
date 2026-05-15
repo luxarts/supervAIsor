@@ -136,6 +136,15 @@ func main() {
 			return nil
 		}
 	}
+	// Announce ourselves on every (re)connect so the backend marks the host
+	// online without waiting for the first JSONL event to flow.
+	cli.OnConnect = func() {
+		if err := cli.Send(map[string]any{"type": "hello", "hostname": host}); err != nil {
+			log.Printf("hello: %v", err)
+			return
+		}
+		log.Printf("hello sent host=%s", host)
+	}
 
 	stop := make(chan struct{})
 	// Re-launch Run on every reconnect: ReadMessage exits permanently when
