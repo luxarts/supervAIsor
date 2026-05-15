@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/luxarts/supervaisor-poller/internal/deleter"
 	"github.com/luxarts/supervaisor-poller/internal/hostname"
 	"github.com/luxarts/supervaisor-poller/internal/offsets"
 	"github.com/luxarts/supervaisor-poller/internal/scanner"
@@ -125,8 +126,18 @@ func main() {
 		log.Fatalf("load offsets: %v", err)
 	}
 	cli := wsclient.New(url)
+	del := deleter.New(cfg.ProjectsDir, cfg.StateFile, off)
+	cli.OnCommand = func(cmd wsclient.Command) error {
+		switch cmd.Type {
+		case "delete":
+			return del.Delete(nil, cmd.SessionID, cmd.ProjectDir)
+		default:
+			return nil
+		}
+	}
 
 	stop := make(chan struct{})
+	go cli.Run(stop)
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
