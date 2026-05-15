@@ -201,6 +201,7 @@ export default function App() {
           lastEventAt={openSession.last_event_at}
           backendHttpBase={HTTP_BASE}
           onClose={() => setOpen(null)}
+          pollerOnline={pollersOnline[openSession.hostname] ?? false}
         />
       )}
     </div>

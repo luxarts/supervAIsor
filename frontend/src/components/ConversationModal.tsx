@@ -34,6 +34,7 @@ interface Props {
   lastEventAt: string;
   backendHttpBase: string;
   onClose: () => void;
+  pollerOnline?: boolean;
 }
 
 export function ConversationModal({
@@ -44,6 +45,7 @@ export function ConversationModal({
   lastEventAt,
   backendHttpBase,
   onClose,
+  pollerOnline,
 }: Props) {
   const [events, setEvents] = useState<Event[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -232,6 +234,8 @@ export function ConversationModal({
               hostname={hostname}
               lastEventAt={lastEventAt}
               backendHttpBase={backendHttpBase}
+              pollerOnline={pollerOnline}
+              onDeleted={onClose}
             />
           )}
         </div>

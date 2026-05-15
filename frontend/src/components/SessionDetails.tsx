@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { isPinned, togglePin, subscribe as subscribePins } from "../lib/pins";
 import { isNotifyEnabled, toggleNotify, subscribeNotify } from "../lib/notify";
+import { deleteSession } from "../lib/deleteSession";
 
 interface Tokens {
   input: number;
@@ -19,6 +20,7 @@ interface Stats {
   id: string;
   name: string;
   project: string;
+  project_dir_encoded?: string;
   model?: string;
   started_at: string;
   last_event_at: string;
@@ -33,11 +35,26 @@ interface Props {
   hostname: string;
   lastEventAt: string;
   backendHttpBase: string;
+  pollerOnline?: boolean;
+  onDeleted?: () => void;
 }
 
-export function SessionDetails({ sessionId, hostname, lastEventAt, backendHttpBase }: Props) {
+export function SessionDetails({
+  sessionId,
+  hostname,
+  lastEventAt,
+  backendHttpBase,
+  pollerOnline,
+  onDeleted,
+}: Props) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteState, setDeleteState] = useState<
+    | { phase: "idle" }
+    | { phase: "confirming" }
+    | { phase: "deleting" }
+    | { phase: "error"; message: string }
+  >({ phase: "idle" });
 
   const settingsKey = `${hostname}:${sessionId}`;
   const pinned = useSyncExternalStore(subscribePins, () => isPinned(settingsKey));
@@ -64,6 +81,13 @@ export function SessionDetails({ sessionId, hostname, lastEventAt, backendHttpBa
     };
   }, [sessionId, hostname, lastEventAt, backendHttpBase]);
 
+  // Auto-revert confirmation after 5s.
+  useEffect(() => {
+    if (deleteState.phase !== "confirming") return;
+    const t = setTimeout(() => setDeleteState({ phase: "idle" }), 5000);
+    return () => clearTimeout(t);
+  }, [deleteState]);
+
   if (error) {
     return <div className="font-hud text-rd p-3">// STATS LOST: {error}</div>;
   }
@@ -82,6 +106,34 @@ export function SessionDetails({ sessionId, hostname, lastEventAt, backendHttpBa
   const fmtNum = (n: number) => n.toLocaleString();
   const breakdown = Object.entries(stats.tool_breakdown).sort((a, b) => b[1] - a[1]);
   const maxTool = breakdown.reduce((m, [, v]) => Math.max(m, v), 0) || 1;
+
+  const onDeleteClick = async () => {
+    if (deleteState.phase === "idle") {
+      setDeleteState({ phase: "confirming" });
+      return;
+    }
+    if (deleteState.phase === "confirming") {
+      setDeleteState({ phase: "deleting" });
+      try {
+        await deleteSession(backendHttpBase, hostname, sessionId);
+        onDeleted?.();
+      } catch (e) {
+        setDeleteState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+      }
+    }
+  };
+
+  const buttonLabel =
+    deleteState.phase === "deleting"
+      ? "DELETING…"
+      : deleteState.phase === "confirming"
+      ? "CONFIRM DELETE"
+      : "DELETE SESSION";
+  const deleteDisabled =
+    pollerOnline !== true || deleteState.phase === "deleting";
+  const fullPath = stats?.project_dir_encoded
+    ? `~/.claude/projects/${stats.project_dir_encoded}/${sessionId}.jsonl`
+    : "(path unavailable)";
 
   return (
     <div className="space-y-4 font-hud text-sm">
@@ -144,6 +196,27 @@ export function SessionDetails({ sessionId, hostname, lastEventAt, backendHttpBa
             toggleNotify(settingsKey);
           }}
         />
+      </Section>
+
+      <Section title="DANGER ZONE">
+        <Row k="Path on host" v={fullPath} />
+        {deleteState.phase === "error" && (
+          <div className="mt-2 border border-rd bg-rd/10 p-2 text-rd text-xs">
+            // {deleteState.message}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onDeleteClick}
+          disabled={deleteDisabled}
+          aria-label="Delete session"
+          title={pollerOnline ? "" : `Poller offline — start the poller on ${hostname} to enable`}
+          className={`mt-2 w-full border px-3 py-2 font-hud text-xs uppercase tracking-widest
+                      touch-manipulation transition-colors
+                      ${deleteDisabled ? "border-dim text-dim cursor-not-allowed" : "border-rd text-rd hover:bg-rd/10"}`}
+        >
+          {buttonLabel}
+        </button>
       </Section>
     </div>
   );

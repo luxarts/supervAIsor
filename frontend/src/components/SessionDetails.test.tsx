@@ -106,4 +106,51 @@ describe("SessionDetails", () => {
     fireEvent.click(notifySwitch);
     expect(isNotifyEnabled("mac-A:abc")).toBe(true);
   });
+
+  it("disables DELETE when pollerOnline is false", async () => {
+    render(
+      <SessionDetails
+        sessionId="abc"
+        hostname="mac-A"
+        lastEventAt="2026-05-14T10:00:00Z"
+        backendHttpBase="http://localhost:8080"
+        pollerOnline={false}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("claude-opus-4-7")).toBeTruthy());
+    const btn = screen.getByRole("button", { name: /delete session/i });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("requires two clicks to delete and calls onDeleted on 204", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        return { ok: true, status: 204, text: async () => "" };
+      }
+      return { ok: true, status: 200, json: async () => stats };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const onDeleted = vi.fn();
+    render(
+      <SessionDetails
+        sessionId="abc"
+        hostname="mac-A"
+        lastEventAt="2026-05-14T10:00:00Z"
+        backendHttpBase="http://localhost:8080"
+        pollerOnline
+        onDeleted={onDeleted}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("claude-opus-4-7")).toBeTruthy());
+    const btn = screen.getByRole("button", { name: /delete session/i });
+    fireEvent.click(btn); // → confirm state
+    expect(btn.textContent).toMatch(/confirm delete/i);
+    fireEvent.click(btn); // → actually deletes
+    await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sessions/mac-A/abc"),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
 });
