@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/luxarts/supervaisor/internal/events"
 	"github.com/luxarts/supervaisor/internal/state"
 	"github.com/luxarts/supervaisor/internal/store"
 )
@@ -64,7 +65,7 @@ func (h *Handler) getSessionEvents(c *gin.Context) {
 		return
 	}
 	if evs == nil {
-		evs = []store.Event{}
+		evs = []events.Event{}
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, evs)

@@ -91,3 +91,12 @@ type ContentBlock struct {
 	ToolUseID string          `json:"tool_use_id,omitempty"` // tool_result
 	IsError   bool            `json:"is_error,omitempty"`    // tool_result
 }
+
+// Event is one row from the events table, as returned by store.ListEvents.
+// Defined here (not in store) to avoid an import cycle: store imports state,
+// and state needs this type for ComputeStats.
+type Event struct {
+	TS      time.Time       `json:"ts"`
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+}

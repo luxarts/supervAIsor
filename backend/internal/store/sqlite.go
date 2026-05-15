@@ -9,6 +9,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/luxarts/supervaisor/internal/events"
 	"github.com/luxarts/supervaisor/internal/state"
 )
 
@@ -162,18 +163,15 @@ func (s *SQLite) AppendEvent(ctx context.Context, hostname, sessionID string, ts
 	return err
 }
 
-// Event is one row from the events table, returned by ListEvents.
-type Event struct {
-	TS      time.Time       `json:"ts"`
-	Type    string          `json:"type"`
-	Payload json.RawMessage `json:"payload"`
-}
+// Event is a type alias for events.Event, kept for backward compatibility.
+// New code should use events.Event directly.
+type Event = events.Event
 
 // ListEvents returns the most recent events for a session, in chronological
 // (ts ASC) order, capped at limit. When the session has more events than
 // limit, the older ones are dropped so the modal always shows the tail of
 // the conversation.
-func (s *SQLite) ListEvents(ctx context.Context, hostname, sessionID string, limit int) ([]Event, error) {
+func (s *SQLite) ListEvents(ctx context.Context, hostname, sessionID string, limit int) ([]events.Event, error) {
 	if limit <= 0 {
 		limit = 500
 	}
@@ -185,7 +183,7 @@ func (s *SQLite) ListEvents(ctx context.Context, hostname, sessionID string, lim
 	}
 	defer rows.Close()
 
-	var out []Event
+	var out []events.Event
 	for rows.Next() {
 		var (
 			ts      time.Time
@@ -195,7 +193,7 @@ func (s *SQLite) ListEvents(ctx context.Context, hostname, sessionID string, lim
 		if err := rows.Scan(&ts, &typ, &payload); err != nil {
 			return nil, err
 		}
-		out = append(out, Event{TS: ts, Type: typ, Payload: json.RawMessage(payload)})
+		out = append(out, events.Event{TS: ts, Type: typ, Payload: json.RawMessage(payload)})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
