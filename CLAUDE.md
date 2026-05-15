@@ -64,13 +64,13 @@ No flags, no env vars. The poller reads every setting from `~/.supervaisor/setti
 {
   "projects_dir": "/Users/you/.claude/projects",
   "state_file":   "/Users/you/.supervaisor/state.json",
-  "backend_host": "localhost",
-  "backend_port": 8080,
-  "backend_url":  "",
+  "backend":      "localhost:8080",
   "hostname":     "",
   "interval":     "1s"
 }
 ```
+
+`backend` is `host[:port][/path]` (no scheme). The poller prepends `ws://` and appends `/ws/ingest`. Examples: `localhost:8080` → `ws://localhost:8080/ws/ingest`, `mmm4p.local/supervaisor` → `ws://mmm4p.local/supervaisor/ws/ingest`.
 
 `-hostname` defaults to the OS hostname with a trailing `.local` stripped (macOS-friendly). Multiple pollers on different machines can target the same backend concurrently.
 

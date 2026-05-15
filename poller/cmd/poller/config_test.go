@@ -7,18 +7,35 @@ import (
 	"time"
 )
 
-func TestResolveBackendURL_DerivesFromHostPort(t *testing.T) {
-	got := resolveBackendURL(Config{BackendHost: "10.0.0.5", BackendPort: 9000})
-	want := "ws://10.0.0.5:9000/ws/ingest"
+func TestResolveBackendURL_HostPort(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "localhost:8080"})
+	want := "ws://localhost:8080/ws/ingest"
 	if got != want {
 		t.Errorf("got %q want %q", got, want)
 	}
 }
 
-func TestResolveBackendURL_RespectsOverride(t *testing.T) {
-	got := resolveBackendURL(Config{BackendURL: "ws://custom/path", BackendHost: "x", BackendPort: 1})
-	if got != "ws://custom/path" {
-		t.Errorf("override ignored: got %q", got)
+func TestResolveBackendURL_HostWithPath(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "mmm4p.local/supervaisor"})
+	want := "ws://mmm4p.local/supervaisor/ws/ingest"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveBackendURL_TrailingSlashTolerated(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "mmm4p.local/supervaisor/"})
+	want := "ws://mmm4p.local/supervaisor/ws/ingest"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveBackendURL_AlreadyHasIngestSuffix(t *testing.T) {
+	got := resolveBackendURL(Config{Backend: "host:1/ws/ingest"})
+	want := "ws://host:1/ws/ingest"
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
 	}
 }
 
@@ -38,7 +55,7 @@ func TestLoadConfig_FirstRunWritesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.BackendHost != "localhost" || c.BackendPort != 8080 {
+	if c.Backend != "localhost:8080" {
 		t.Errorf("bad defaults: %#v", c)
 	}
 	if c.Interval != time.Second {
@@ -58,11 +75,9 @@ func TestLoadConfig_ReadsExistingFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := `{
-	  "backend_host": "5.6.7.8",
-	  "backend_port": 1234,
+	  "backend": "mmm4p.local/supervaisor",
 	  "hostname": "from-file",
-	  "interval": "500ms",
-	  "backend_url": "ws://file/ws/ingest"
+	  "interval": "500ms"
 	}`
 	if err := os.WriteFile(settingsPath(home), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -71,14 +86,11 @@ func TestLoadConfig_ReadsExistingFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.BackendHost != "5.6.7.8" || c.BackendPort != 1234 || c.Hostname != "from-file" {
+	if c.Backend != "mmm4p.local/supervaisor" || c.Hostname != "from-file" {
 		t.Errorf("file not applied: %#v", c)
 	}
 	if c.Interval != 500*time.Millisecond {
 		t.Errorf("interval not parsed: %v", c.Interval)
-	}
-	if c.BackendURL != "ws://file/ws/ingest" {
-		t.Errorf("BackendURL = %q", c.BackendURL)
 	}
 }
 
@@ -97,7 +109,7 @@ func TestLoadConfig_PartialFileKeepsDefaults(t *testing.T) {
 	if c.Hostname != "mac-A" {
 		t.Errorf("hostname: %q", c.Hostname)
 	}
-	if c.BackendHost != "localhost" || c.BackendPort != 8080 {
+	if c.Backend != "localhost:8080" {
 		t.Errorf("defaults clobbered by partial file: %#v", c)
 	}
 }

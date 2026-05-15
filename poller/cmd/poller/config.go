@@ -20,9 +20,7 @@ const (
 type Config struct {
 	ProjectsDir string        `json:"projects_dir"`
 	StateFile   string        `json:"state_file"`
-	BackendHost string        `json:"backend_host"`
-	BackendPort int           `json:"backend_port"`
-	BackendURL  string        `json:"backend_url,omitempty"`
+	Backend     string        `json:"backend"`
 	Hostname    string        `json:"hostname,omitempty"`
 	Interval    time.Duration `json:"-"`
 	IntervalStr string        `json:"interval"`
@@ -35,8 +33,7 @@ func defaultConfig(home string) Config {
 	return Config{
 		ProjectsDir: filepath.Join(home, ".claude", "projects"),
 		StateFile:   statePath(home),
-		BackendHost: "localhost",
-		BackendPort: 8080,
+		Backend:     "localhost:8080",
 		Interval:    time.Second,
 		IntervalStr: "1s",
 	}
@@ -77,14 +74,8 @@ func readConfig(path string, c *Config) error {
 	if raw.StateFile != "" {
 		c.StateFile = raw.StateFile
 	}
-	if raw.BackendHost != "" {
-		c.BackendHost = raw.BackendHost
-	}
-	if raw.BackendPort != 0 {
-		c.BackendPort = raw.BackendPort
-	}
-	if raw.BackendURL != "" {
-		c.BackendURL = raw.BackendURL
+	if raw.Backend != "" {
+		c.Backend = raw.Backend
 	}
 	if raw.Hostname != "" {
 		c.Hostname = raw.Hostname

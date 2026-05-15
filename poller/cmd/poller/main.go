@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,11 +18,16 @@ import (
 	"github.com/luxarts/supervaisor-poller/internal/wsclient"
 )
 
+// resolveBackendURL turns the user-facing "host:port/path" form into a full
+// WS URL. The scheme is fixed (ws://) and "/ws/ingest" is appended if the
+// configured value doesn't already end with it, so both "localhost:8080" and
+// "mmm4p.local/supervaisor" yield the right endpoint.
 func resolveBackendURL(c Config) string {
-	if c.BackendURL != "" {
-		return c.BackendURL
+	b := strings.TrimSuffix(c.Backend, "/")
+	if !strings.HasSuffix(b, "/ws/ingest") {
+		b += "/ws/ingest"
 	}
-	return fmt.Sprintf("ws://%s:%d/ws/ingest", c.BackendHost, c.BackendPort)
+	return "ws://" + b
 }
 
 func resolveHostname(c Config) (string, error) {
