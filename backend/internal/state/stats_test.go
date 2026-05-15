@@ -143,6 +143,27 @@ func TestComputeStats_UserPromptStringContent(t *testing.T) {
 	}
 }
 
+func TestComputeStats_MixedTextAndToolResultCountsAsUserPrompt(t *testing.T) {
+	t0 := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
+	sess := &Session{StartedAt: t0, LastEventAt: t0}
+	evs := []events.Event{
+		mustEvent(t, t0, "user", map[string]any{
+			"type": "user",
+			"message": map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{"type": "tool_result", "tool_use_id": "x"},
+					map[string]any{"type": "text", "text": "follow-up question"},
+				},
+			},
+		}),
+	}
+	got := ComputeStats(evs, sess)
+	if got.Counts.UserPrompts != 1 {
+		t.Errorf("UserPrompts = %d, want 1 (mixed text+tool_result counts)", got.Counts.UserPrompts)
+	}
+}
+
 func TestComputeStats_ToolResultsAreNotUserPrompts(t *testing.T) {
 	t0 := time.Date(2026, 5, 14, 10, 0, 0, 0, time.UTC)
 	sess := &Session{StartedAt: t0, LastEventAt: t0}

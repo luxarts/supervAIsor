@@ -88,12 +88,10 @@ func ComputeStats(evs []events.Event, sess *Session) Stats {
 			if line.Message == nil {
 				continue
 			}
-			sawToolResult := false
 			sawText := false
 			for _, b := range line.Message.Content {
 				switch b.Type {
 				case "tool_result":
-					sawToolResult = true
 					if b.IsError {
 						out.Counts.Errors++
 					}
@@ -103,7 +101,7 @@ func ComputeStats(evs []events.Event, sess *Session) Stats {
 					}
 				}
 			}
-			if !sawToolResult && sawText {
+			if sawText {
 				out.Counts.UserPrompts++
 			}
 		}
