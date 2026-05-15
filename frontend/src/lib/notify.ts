@@ -6,20 +6,36 @@ const KEY = "sv:notify";
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
+// Cached snapshot for useSyncExternalStore — must be referentially stable
+// when the underlying serialized value hasn't changed, otherwise React 19
+// throws an infinite-loop detection error.
+let cachedRaw: string | null = null;
+let cachedSet: Set<string> = new Set();
+
 function read(): Set<string> {
+  const raw = localStorage.getItem(KEY);
+  if (raw === cachedRaw) return cachedSet;
+  cachedRaw = raw;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return new Set();
+    if (!raw) {
+      cachedSet = new Set();
+      return cachedSet;
+    }
     const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((v): v is string => typeof v === "string"));
+    if (!Array.isArray(arr)) {
+      cachedSet = new Set();
+      return cachedSet;
+    }
+    cachedSet = new Set(arr.filter((v): v is string => typeof v === "string"));
   } catch {
-    return new Set();
+    cachedSet = new Set();
   }
+  return cachedSet;
 }
 
 function write(set: Set<string>): void {
   localStorage.setItem(KEY, JSON.stringify([...set]));
+  cachedRaw = null;
   for (const fn of listeners) fn();
 }
 
