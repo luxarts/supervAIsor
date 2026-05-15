@@ -9,17 +9,18 @@ import (
 
 // Stats is the on-demand aggregate view of a session's stored events.
 type Stats struct {
-	Hostname         string         `json:"hostname"`
-	ID               string         `json:"id"`
-	Name             string         `json:"name"`
-	Project          string         `json:"project"`
-	Model            string         `json:"model,omitempty"`
-	StartedAt        time.Time      `json:"started_at"`
-	LastEventAt      time.Time      `json:"last_event_at"`
-	WallClockSeconds int64          `json:"wall_clock_seconds"`
-	Tokens           TokenTotals    `json:"tokens"`
-	Counts           SessionCounts  `json:"counts"`
-	ToolBreakdown    map[string]int `json:"tool_breakdown"`
+	Hostname          string         `json:"hostname"`
+	ID                string         `json:"id"`
+	Name              string         `json:"name"`
+	Project           string         `json:"project"`
+	ProjectDirEncoded string         `json:"project_dir_encoded,omitempty"`
+	Model             string         `json:"model,omitempty"`
+	StartedAt         time.Time      `json:"started_at"`
+	LastEventAt       time.Time      `json:"last_event_at"`
+	WallClockSeconds  int64          `json:"wall_clock_seconds"`
+	Tokens            TokenTotals    `json:"tokens"`
+	Counts            SessionCounts  `json:"counts"`
+	ToolBreakdown     map[string]int `json:"tool_breakdown"`
 }
 
 type TokenTotals struct {
@@ -41,13 +42,14 @@ type SessionCounts struct {
 // ToolBreakdown is always non-nil so callers can range over it safely.
 func ComputeStats(evs []events.Event, sess *Session) Stats {
 	out := Stats{
-		Hostname:      sess.Hostname,
-		ID:            sess.ID,
-		Name:          sess.Name,
-		Project:       sess.Project,
-		StartedAt:     sess.StartedAt,
-		LastEventAt:   sess.LastEventAt,
-		ToolBreakdown: map[string]int{},
+		Hostname:          sess.Hostname,
+		ID:                sess.ID,
+		Name:              sess.Name,
+		Project:           sess.Project,
+		ProjectDirEncoded: sess.ProjectDirEncoded,
+		StartedAt:         sess.StartedAt,
+		LastEventAt:       sess.LastEventAt,
+		ToolBreakdown:     map[string]int{},
 	}
 	if !sess.LastEventAt.IsZero() && !sess.StartedAt.IsZero() {
 		d := sess.LastEventAt.Sub(sess.StartedAt)

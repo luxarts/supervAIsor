@@ -183,3 +183,16 @@ func TestComputeStats_ToolResultsAreNotUserPrompts(t *testing.T) {
 		t.Errorf("UserPrompts = %d, want 0 (tool_result only)", got.Counts.UserPrompts)
 	}
 }
+
+func TestComputeStats_IncludesProjectDirEncoded(t *testing.T) {
+	t0 := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	sess := &Session{
+		Hostname: "h", ID: "abc", Name: "n", Project: "/p",
+		StartedAt: t0, LastEventAt: t0,
+		ProjectDirEncoded: "-Users-x-Projects-foo",
+	}
+	got := ComputeStats(nil, sess)
+	if got.ProjectDirEncoded != "-Users-x-Projects-foo" {
+		t.Errorf("ProjectDirEncoded = %q", got.ProjectDirEncoded)
+	}
+}
