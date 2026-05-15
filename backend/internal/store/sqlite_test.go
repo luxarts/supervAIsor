@@ -176,6 +176,64 @@ func TestListEvents_NegativeLimitReturnsAll(t *testing.T) {
 	}
 }
 
+func TestUpsertSession_RoundTripsLastErrorAt(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "err.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:      state.StatusDone,
+		StartedAt:   t0,
+		LastEventAt: t0.Add(time.Minute),
+		LastErrorAt: t0.Add(30 * time.Second),
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetSession(ctx, "h", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("got nil session")
+	}
+	if !got.LastErrorAt.Equal(in.LastErrorAt) {
+		t.Errorf("LastErrorAt = %v, want %v", got.LastErrorAt, in.LastErrorAt)
+	}
+}
+
+func TestUpsertSession_ZeroLastErrorAtRoundTrips(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "noerr.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	in := &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status:      state.StatusDone,
+		StartedAt:   t0,
+		LastEventAt: t0,
+	}
+	if err := st.UpsertSession(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetSession(ctx, "h", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.LastErrorAt.IsZero() {
+		t.Errorf("LastErrorAt = %v, want zero", got.LastErrorAt)
+	}
+}
+
 func TestUpsertSession_SameIDDifferentHosts(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

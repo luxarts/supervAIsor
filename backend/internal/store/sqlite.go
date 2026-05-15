@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -33,6 +34,13 @@ func Open(path string) (*SQLite, error) {
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
+	for _, m := range migrations {
+		if _, err := db.Exec(m); err != nil {
+			if !strings.Contains(err.Error(), "duplicate column name") {
+				return nil, fmt.Errorf("migrate: %w", err)
+			}
+		}
+	}
 	return &SQLite{db: db}, nil
 }
 
@@ -58,6 +66,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   last_prompt_at  TIMESTAMP,
   current_action  TEXT,
   last_event_at   TIMESTAMP NOT NULL,
+  last_error_at   TIMESTAMP,
   PRIMARY KEY (hostname, id)
 );
 CREATE TABLE IF NOT EXISTS events (
@@ -71,15 +80,26 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_session_ts ON events(hostname, session_id, ts);
 `
 
+// migrations contains idempotent ALTER TABLE statements that bring older
+// databases up to the current schema. SQLite errors on duplicate columns,
+// so we tolerate the failure for the additive case.
+var migrations = []string{
+	`ALTER TABLE sessions ADD COLUMN last_error_at TIMESTAMP`,
+}
+
 // UpsertSession inserts or updates a session record by primary key.
 func (s *SQLite) UpsertSession(ctx context.Context, sess *state.Session) error {
 	var lastPrompt any
 	if sess.LastPromptAt != nil {
 		lastPrompt = *sess.LastPromptAt
 	}
+	var lastError any
+	if !sess.LastErrorAt.IsZero() {
+		lastError = sess.LastErrorAt
+	}
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO sessions (hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at)
-VALUES (?,?,?,?,?,?,?,?,?)
+INSERT INTO sessions (hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at)
+VALUES (?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(hostname, id) DO UPDATE SET
   name=excluded.name,
   project=excluded.project,
@@ -87,10 +107,11 @@ ON CONFLICT(hostname, id) DO UPDATE SET
   started_at=excluded.started_at,
   last_prompt_at=excluded.last_prompt_at,
   current_action=excluded.current_action,
-  last_event_at=excluded.last_event_at
+  last_event_at=excluded.last_event_at,
+  last_error_at=excluded.last_error_at
 `,
 		sess.Hostname, sess.ID, sess.Name, sess.Project, string(sess.Status),
-		sess.StartedAt, lastPrompt, sess.CurrentAction, sess.LastEventAt,
+		sess.StartedAt, lastPrompt, sess.CurrentAction, sess.LastEventAt, lastError,
 	)
 	return err
 }
@@ -98,7 +119,7 @@ ON CONFLICT(hostname, id) DO UPDATE SET
 // ListSessions returns all sessions ordered by last_event_at descending.
 func (s *SQLite) ListSessions(ctx context.Context) ([]*state.Session, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at
+SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at
 FROM sessions ORDER BY last_event_at DESC`)
 	if err != nil {
 		return nil, err
@@ -111,10 +132,11 @@ FROM sessions ORDER BY last_event_at DESC`)
 			sess   state.Session
 			status string
 			lp     sql.NullTime
+			le     sql.NullTime
 		)
 		if err := rows.Scan(
 			&sess.Hostname, &sess.ID, &sess.Name, &sess.Project, &status,
-			&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt,
+			&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt, &le,
 		); err != nil {
 			return nil, err
 		}
@@ -122,6 +144,9 @@ FROM sessions ORDER BY last_event_at DESC`)
 		if lp.Valid {
 			t := lp.Time
 			sess.LastPromptAt = &t
+		}
+		if le.Valid {
+			sess.LastErrorAt = le.Time
 		}
 		out = append(out, &sess)
 	}
@@ -131,15 +156,16 @@ FROM sessions ORDER BY last_event_at DESC`)
 // GetSession returns a session by (hostname, id), or nil if not found.
 func (s *SQLite) GetSession(ctx context.Context, hostname, id string) (*state.Session, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at
+SELECT hostname, id, name, project, status, started_at, last_prompt_at, current_action, last_event_at, last_error_at
 FROM sessions WHERE hostname = ? AND id = ?`, hostname, id)
 	var (
 		sess   state.Session
 		status string
 		lp     sql.NullTime
+		le     sql.NullTime
 	)
 	err := row.Scan(&sess.Hostname, &sess.ID, &sess.Name, &sess.Project, &status,
-		&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt)
+		&sess.StartedAt, &lp, &sess.CurrentAction, &sess.LastEventAt, &le)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -150,6 +176,9 @@ FROM sessions WHERE hostname = ? AND id = ?`, hostname, id)
 	if lp.Valid {
 		t := lp.Time
 		sess.LastPromptAt = &t
+	}
+	if le.Valid {
+		sess.LastErrorAt = le.Time
 	}
 	return &sess, nil
 }
