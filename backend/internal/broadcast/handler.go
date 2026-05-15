@@ -29,10 +29,14 @@ type Handler struct {
 }
 
 type frame struct {
-	Kind     string           `json:"kind"`
-	Sessions []*state.Session `json:"sessions,omitempty"`
+	Kind string `json:"kind"`
+	// Sessions and Online intentionally do NOT use omitempty: encoding/json
+	// omits empty slices and maps, which would make a fresh-install
+	// snapshot/pollers frame arrive with no "sessions"/"online" key at all,
+	// crashing the frontend's setSessions/setPollersOnline.
+	Sessions []*state.Session `json:"sessions"`
 	Session  *state.Session   `json:"session,omitempty"`
-	Online   map[string]bool  `json:"online,omitempty"`
+	Online   map[string]bool  `json:"online"`
 }
 
 // Serve handles the /ws/clients WebSocket endpoint.

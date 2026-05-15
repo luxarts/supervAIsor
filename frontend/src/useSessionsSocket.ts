@@ -31,7 +31,7 @@ export function useSessionsSocket(url: string): SocketState {
         try {
           const frame = JSON.parse(ev.data) as Frame;
           if (frame.kind === "snapshot") {
-            setSessions(frame.sessions);
+            setSessions(frame.sessions ?? []);
           } else if (frame.kind === "update") {
             setSessions((prev) => {
               const key = (s: Session) => `${s.hostname}:${s.id}`;
@@ -47,7 +47,7 @@ export function useSessionsSocket(url: string): SocketState {
               prev.filter((s) => !(s.id === frame.session_id && s.hostname === frame.hostname)),
             );
           } else if (frame.kind === "pollers") {
-            setPollersOnline(frame.online);
+            setPollersOnline(frame.online ?? {});
           } else if (frame.kind === "session_removed") {
             setSessions((prev) =>
               prev.filter((s) => !(s.id === frame.id && s.hostname === frame.hostname)),
