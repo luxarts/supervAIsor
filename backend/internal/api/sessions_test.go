@@ -12,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/luxarts/supervaisor/internal/broadcast"
+	"github.com/luxarts/supervaisor/internal/ingest"
 	"github.com/luxarts/supervaisor/internal/state"
 	"github.com/luxarts/supervaisor/internal/store"
 )
@@ -222,5 +224,178 @@ func TestGetSessionStats_NotFound(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+type fakeSender struct {
+	online   map[string]bool
+	last     []byte
+	lastHost string
+}
+
+func (f *fakeSender) IsOnline(h string) bool { return f.online[h] }
+func (f *fakeSender) Send(h string, b []byte) error {
+	if !f.online[h] {
+		return ingest.ErrNoPoller
+	}
+	f.lastHost = h
+	f.last = b
+	return nil
+}
+
+func TestDeleteSession_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	st, _ := store.Open(filepath.Join(t.TempDir(), "del.db"))
+	defer st.Close()
+	r := gin.New()
+	(&Handler{
+		Store:       st,
+		Sender:      &fakeSender{online: map[string]bool{}},
+		Coordinator: ingest.NewDeleteCoordinator(time.Second),
+	}).Register(r)
+
+	req := httptest.NewRequest("DELETE", "/sessions/h/missing", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("want 404, got %d", w.Code)
+	}
+}
+
+func TestDeleteSession_PollerOffline(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	st, _ := store.Open(filepath.Join(t.TempDir(), "off.db"))
+	defer st.Close()
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	_ = st.UpsertSession(ctx, &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status: state.StatusDone, StartedAt: t0, LastEventAt: t0,
+		ProjectDirEncoded: "-x",
+	})
+
+	r := gin.New()
+	(&Handler{
+		Store:       st,
+		Sender:      &fakeSender{online: map[string]bool{}},
+		Coordinator: ingest.NewDeleteCoordinator(time.Second),
+	}).Register(r)
+
+	req := httptest.NewRequest("DELETE", "/sessions/h/abc", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("want 409, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteSession_HappyPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	st, _ := store.Open(filepath.Join(t.TempDir(), "ok.db"))
+	defer st.Close()
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	_ = st.UpsertSession(ctx, &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status: state.StatusDone, StartedAt: t0, LastEventAt: t0,
+		ProjectDirEncoded: "-x",
+	})
+
+	coord := ingest.NewDeleteCoordinator(2 * time.Second)
+	defer coord.Close()
+	hub := broadcast.NewHub()
+	go hub.Run()
+	defer hub.Stop()
+
+	sender := &fakeSender{online: map[string]bool{"h": true}}
+
+	r := gin.New()
+	(&Handler{Store: st, Sender: sender, Coordinator: coord, Hub: hub}).Register(r)
+
+	respCh := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest("DELETE", "/sessions/h/abc", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		respCh <- w
+	}()
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if sender.last != nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if sender.last == nil {
+		t.Fatal("handler never dispatched delete command")
+	}
+
+	var sent map[string]any
+	_ = json.Unmarshal(sender.last, &sent)
+	reqID, _ := sent["request_id"].(string)
+	if reqID == "" {
+		t.Fatal("dispatched command missing request_id")
+	}
+	coord.Resolve(reqID, true, "")
+
+	w := <-respCh
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("want 204, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	got, _ := st.GetSession(ctx, "h", "abc")
+	if got != nil {
+		t.Errorf("session not purged: %+v", got)
+	}
+}
+
+func TestDeleteSession_PollerErrorAck(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	st, _ := store.Open(filepath.Join(t.TempDir(), "ack.db"))
+	defer st.Close()
+	ctx := context.Background()
+	t0 := time.Now().UTC().Truncate(time.Second)
+	_ = st.UpsertSession(ctx, &state.Session{
+		ID: "abc", Hostname: "h", Name: "n", Project: "/p",
+		Status: state.StatusDone, StartedAt: t0, LastEventAt: t0,
+		ProjectDirEncoded: "-x",
+	})
+
+	coord := ingest.NewDeleteCoordinator(2 * time.Second)
+	defer coord.Close()
+	hub := broadcast.NewHub()
+	go hub.Run()
+	defer hub.Stop()
+
+	sender := &fakeSender{online: map[string]bool{"h": true}}
+	r := gin.New()
+	(&Handler{Store: st, Sender: sender, Coordinator: coord, Hub: hub}).Register(r)
+
+	respCh := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest("DELETE", "/sessions/h/abc", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		respCh <- w
+	}()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if sender.last != nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	var sent map[string]any
+	_ = json.Unmarshal(sender.last, &sent)
+	reqID, _ := sent["request_id"].(string)
+	coord.Resolve(reqID, false, "boom")
+	w := <-respCh
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("want 500, got %d", w.Code)
+	}
+	got, _ := st.GetSession(ctx, "h", "abc")
+	if got == nil {
+		t.Fatal("session should still exist after error ack")
 	}
 }
