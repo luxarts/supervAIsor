@@ -22,4 +22,15 @@ describe("SessionCard", () => {
     expect(h2?.querySelector(".text-yl")?.textContent).toBe("@");
     expect(h2?.querySelector(".text-cy")?.textContent).toBe("mac-A");
   });
+
+  it("renders status badge with relative-age subtitle", () => {
+    const sess2 = {
+      ...sess,
+      status: "done" as const,
+      last_event_at: new Date(Date.now() - 12_000).toISOString(),
+    };
+    const { container } = render(<SessionCard session={sess2} onOpen={() => {}} />);
+    expect(container.textContent).toContain("DONE");
+    expect(container.textContent).toMatch(/·\s*1[12]s/);
+  });
 });

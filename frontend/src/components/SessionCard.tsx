@@ -3,6 +3,7 @@ import type { Session } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { formatDuration } from "../lib/time";
 import { shortProject } from "../lib/path";
+import { formatRelative } from "../lib/relativeTime";
 
 interface Props {
   session: Session;
@@ -20,6 +21,7 @@ export function SessionCard({ session, onOpen }: Props) {
   const prompt = session.last_prompt_at
     ? now - new Date(session.last_prompt_at).getTime()
     : null;
+  const age = now - new Date(session.last_event_at).getTime();
 
   return (
     <button
@@ -31,7 +33,12 @@ export function SessionCard({ session, onOpen }: Props) {
                   ${session.status === "working" ? "shadow-[0_0_18px_rgba(0,240,255,0.25)]" : ""}`}
     >
       <header className="flex items-start justify-between gap-2">
-        <StatusBadge status={session.status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={session.status} />
+          <span className="font-hud text-[10px] text-dim">
+            · {formatRelative(age)}
+          </span>
+        </div>
         <div className="font-hud text-[10px] text-dim truncate max-w-[55%]">
           {shortProject(session.project)}
         </div>
