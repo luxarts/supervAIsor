@@ -18,7 +18,8 @@ type staticSnapshot struct {
 	sessions []*state.Session
 }
 
-func (s *staticSnapshot) Snapshot() []*state.Session { return s.sessions }
+func (s *staticSnapshot) Snapshot() []*state.Session     { return s.sessions }
+func (s *staticSnapshot) PollersOnline() map[string]bool { return map[string]bool{} }
 
 func wsURL(u string) string {
 	return "ws" + strings.TrimPrefix(u, "http")
@@ -86,10 +87,13 @@ func TestHandler_LiveUpdate(t *testing.T) {
 	}
 	defer conn.Close()
 
-	// Consume the snapshot frame.
+	// Consume the snapshot and pollers frames.
 	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if _, _, err := conn.ReadMessage(); err != nil {
 		t.Fatalf("read snapshot: %v", err)
+	}
+	if _, _, err := conn.ReadMessage(); err != nil {
+		t.Fatalf("read pollers: %v", err)
 	}
 
 	// Give the subscription a moment to register before broadcasting.
@@ -106,3 +110,48 @@ func TestHandler_LiveUpdate(t *testing.T) {
 		t.Errorf("expected s2 in update, got: %s", raw)
 	}
 }
+
+func TestHandler_PollersFrameOnConnect(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	t.Cleanup(hub.Stop)
+
+	provider := &staticSnapshotWithPollers{
+		sessions: nil,
+		pollers:  map[string]bool{"mac-A": true},
+	}
+	h := &Handler{Hub: hub, Snapshot: provider}
+	srv := httptest.NewServer(http.HandlerFunc(h.Serve))
+	t.Cleanup(srv.Close)
+
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL(srv.URL), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	for i := 0; i < 2; i++ {
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var f map[string]any
+		_ = json.Unmarshal(data, &f)
+		if f["kind"] == "pollers" {
+			online, _ := f["online"].(map[string]any)
+			if online["mac-A"] != true {
+				t.Errorf("expected mac-A online, got %+v", online)
+			}
+			return
+		}
+	}
+	t.Fatal("never received pollers frame")
+}
+
+type staticSnapshotWithPollers struct {
+	sessions []*state.Session
+	pollers  map[string]bool
+}
+
+func (s *staticSnapshotWithPollers) Snapshot() []*state.Session     { return s.sessions }
+func (s *staticSnapshotWithPollers) PollersOnline() map[string]bool { return s.pollers }

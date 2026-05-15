@@ -36,9 +36,13 @@ func main() {
 	go hub.Run()
 	defer hub.Stop()
 
-	ingestH := &ingest.Handler{Store: db, Hub: hub}
-	clientsH := &broadcast.Handler{Hub: hub, Snapshot: snapshotProvider{db}}
-	apiH := &api.Handler{Store: db}
+	registry := ingest.NewRegistry()
+	coord := ingest.NewDeleteCoordinator(10 * time.Second)
+	defer coord.Close()
+
+	ingestH := &ingest.Handler{Store: db, Hub: hub, Registry: registry, Coordinator: coord}
+	clientsH := &broadcast.Handler{Hub: hub, Snapshot: snapshotProvider{db: db, registry: registry}}
+	apiH := &api.Handler{Store: db, Sender: registry, Coordinator: coord, Hub: hub}
 
 	r := gin.Default()
 	r.Use(corsMiddleware())
@@ -46,8 +50,8 @@ func main() {
 	r.GET("/ws/ingest", gin.WrapF(ingestH.Serve))
 	r.GET("/ws/clients", gin.WrapF(clientsH.Serve))
 
-	// Periodic status recompute (DONE/STALE transitions).
 	go runStatusTicker(db, hub)
+	go runPollersBroadcaster(registry, hub)
 
 	log.Printf("supervAIsor backend on :%s, db=%s", port, dbPath)
 	if err := r.Run(":" + port); err != nil {
@@ -55,8 +59,10 @@ func main() {
 	}
 }
 
-// snapshotProvider wraps *store.SQLite and satisfies broadcast.SnapshotProvider.
-type snapshotProvider struct{ db *store.SQLite }
+type snapshotProvider struct {
+	db       *store.SQLite
+	registry *ingest.Registry
+}
 
 func (s snapshotProvider) Snapshot() []*state.Session {
 	sess, _ := s.db.ListSessions(context.Background())
@@ -66,8 +72,13 @@ func (s snapshotProvider) Snapshot() []*state.Session {
 	return sess
 }
 
-// runStatusTicker runs every 5 seconds, recomputes time-based session statuses,
-// persists any that changed, and broadcasts updates.
+func (s snapshotProvider) PollersOnline() map[string]bool {
+	if s.registry == nil {
+		return map[string]bool{}
+	}
+	return s.registry.Online()
+}
+
 func runStatusTicker(db *store.SQLite, hub *broadcast.Hub) {
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
@@ -93,10 +104,21 @@ func runStatusTicker(db *store.SQLite, hub *broadcast.Hub) {
 	}
 }
 
+// runPollersBroadcaster fans poller liveness transitions out to all
+// connected dashboard clients.
+func runPollersBroadcaster(registry *ingest.Registry, hub *broadcast.Hub) {
+	sub, _ := registry.Subscribe()
+	for snap := range sub {
+		if b, err := json.Marshal(map[string]any{"kind": "pollers", "online": snap}); err == nil {
+			hub.Broadcast(b)
+		}
+	}
+}
+
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
