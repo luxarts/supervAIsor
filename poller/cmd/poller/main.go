@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -130,14 +131,32 @@ func main() {
 	cli.OnCommand = func(cmd wsclient.Command) error {
 		switch cmd.Type {
 		case "delete":
-			return del.Delete(nil, cmd.SessionID, cmd.ProjectDir)
+			return del.Delete(context.Background(), cmd.SessionID, cmd.ProjectDir)
 		default:
 			return nil
 		}
 	}
 
 	stop := make(chan struct{})
-	go cli.Run(stop)
+	// Re-launch Run on every reconnect: ReadMessage exits permanently when
+	// the underlying conn drops, so we need to relaunch it after the scanner
+	// re-establishes the connection. The loop polls for a live conn cheaply
+	// and exits when stop is closed.
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			cli.Run(stop)
+			select {
+			case <-stop:
+				return
+			case <-time.After(time.Second):
+			}
+		}
+	}()
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {

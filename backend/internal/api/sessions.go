@@ -167,6 +167,10 @@ func (h *Handler) deleteSession(c *gin.Context) {
 	}
 	body, _ := json.Marshal(cmd)
 	if err := h.Sender.Send(hostname, body); err != nil {
+		// Clean up the pending coordinator entry so the timer doesn't
+		// hang on for 10s after we've already given up.
+		h.Coordinator.Resolve(reqID, false, err.Error())
+		<-respCh
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
