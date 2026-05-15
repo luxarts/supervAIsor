@@ -5,6 +5,20 @@ import (
 	"testing"
 )
 
+func TestForget_RemovesEntry(t *testing.T) {
+	s := &Store{m: map[string]fileOffset{
+		"/a": {Inode: 1, Offset: 10},
+		"/b": {Inode: 2, Offset: 20},
+	}}
+	s.Forget("/a")
+	if _, _, ok := s.Get("/a"); ok {
+		t.Error("/a should be forgotten")
+	}
+	if _, _, ok := s.Get("/b"); !ok {
+		t.Error("/b should still be present")
+	}
+}
+
 func TestLoadSaveRoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "s.json")
 	s, err := Load(p)
