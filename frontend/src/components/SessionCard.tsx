@@ -8,9 +8,20 @@ import { formatRelative } from "../lib/relativeTime";
 interface Props {
   session: Session;
   onOpen: () => void;
+  pinned?: boolean;
+  notify?: boolean;
+  errorActive?: boolean;
+  flash?: "complete" | "error" | null;
 }
 
-export function SessionCard({ session, onOpen }: Props) {
+export function SessionCard({
+  session,
+  onOpen,
+  pinned = false,
+  notify = false,
+  errorActive = false,
+  flash = null,
+}: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -23,15 +34,32 @@ export function SessionCard({ session, onOpen }: Props) {
     : null;
   const age = now - new Date(session.last_event_at).getTime();
 
+  const flashClass =
+    flash === "error" ? "flash-error" : flash === "complete" ? "flash-complete" : "";
+  const borderColor = errorActive
+    ? "border-rd"
+    : "border-cy/30 hover:border-cy";
+  const workingGlow =
+    session.status === "working" && !errorActive
+      ? "shadow-[0_0_18px_rgba(0,240,255,0.25)]"
+      : "";
+
   return (
     <button
       type="button"
       onClick={onOpen}
       className={`relative min-h-[160px] w-full border bg-bg-panel p-4 text-left transition-colors
-                  border-cy/30 hover:border-cy active:scale-[0.99] touch-manipulation
+                  active:scale-[0.99] touch-manipulation
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cy
-                  ${session.status === "working" ? "shadow-[0_0_18px_rgba(0,240,255,0.25)]" : ""}`}
+                  ${borderColor} ${workingGlow} ${flashClass}`}
     >
+      {(pinned || notify) && (
+        <div className="absolute right-2 top-2 flex items-center gap-1 text-xs">
+          {pinned && <span aria-label="Pinned" title="Pinned">📌</span>}
+          {notify && <span aria-label="Notify enabled" title="Notify enabled">🔔</span>}
+        </div>
+      )}
+
       <header className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <StatusBadge status={session.status} />

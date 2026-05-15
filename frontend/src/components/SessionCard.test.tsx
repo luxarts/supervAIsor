@@ -33,4 +33,34 @@ describe("SessionCard", () => {
     expect(container.textContent).toContain("DONE");
     expect(container.textContent).toMatch(/·\s*1[12]s/);
   });
+
+  it("shows the pin icon when pinned prop is true", () => {
+    const { container, rerender } = render(<SessionCard session={sess} onOpen={() => {}} />);
+    expect(container.textContent).not.toContain("📌");
+    rerender(<SessionCard session={sess} onOpen={() => {}} pinned />);
+    expect(container.textContent).toContain("📌");
+  });
+
+  it("shows the notify icon when notify prop is true", () => {
+    const { container, rerender } = render(<SessionCard session={sess} onOpen={() => {}} />);
+    expect(container.textContent).not.toContain("🔔");
+    rerender(<SessionCard session={sess} onOpen={() => {}} notify />);
+    expect(container.textContent).toContain("🔔");
+  });
+
+  it("applies the flash-complete class when flash='complete'", () => {
+    const { container } = render(
+      <SessionCard session={sess} onOpen={() => {}} flash="complete" />,
+    );
+    expect(container.querySelector(".flash-complete")).toBeTruthy();
+  });
+
+  it("applies persistent red border + flash-error when errorActive", () => {
+    const { container } = render(
+      <SessionCard session={sess} onOpen={() => {}} errorActive flash="error" />,
+    );
+    const btn = container.querySelector("button");
+    expect(btn?.className).toContain("border-rd");
+    expect(container.querySelector(".flash-error")).toBeTruthy();
+  });
 });
