@@ -6,7 +6,7 @@ Guidance for Claude Code working in this repository.
 
 **supervAIsor** is a mobile-first, Cyberpunk 2077-themed dashboard for monitoring local Claude Code sessions. One or more host-native pollers tail Claude's JSONL session files on different machines and ship events to a single backend, which derives session state and broadcasts updates to a web UI.
 
-It is **read-only monitoring** — it does not spawn, kill, or control sessions.
+It is mostly **read-only monitoring** — it does not spawn or control sessions. The one user-initiated write is **deletion**: the dashboard can request a poller to remove a specific session's `.jsonl` from disk, gated by a per-host liveness LED.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ poller (mac C) ──ws──┘   └─ SQLite (volume)
 Three processes:
 
 - **`poller/`** — host-native Go binary. Tails `~/.claude/projects/*/*.jsonl`, persists per-file read offsets in `~/.supervAIsor/poller-state.json`, ships envelopes over `ws://backend/ws/ingest`. Must run on the host (not in a container) for filesystem access. Each poller stamps every envelope with its `hostname`; multiple pollers on different machines can target the same backend concurrently.
-- **`backend/`** — Go (Gin + gorilla/websocket). Endpoints: `GET /healthz`, `GET /sessions`, `GET /sessions/:hostname/:id/events`, `WS /ws/ingest` (multi-writer; one connection per poller), `WS /ws/clients` (fan-out). Pure state derivation lives in `internal/state/`. Persistence via SQLite (`modernc.org/sqlite`, no CGO) with WAL + `busy_timeout` to tolerate concurrent writers. Sessions are keyed by composite `(hostname, session_id)`.
+- **`backend/`** — Go (Gin + gorilla/websocket). Endpoints: `GET /healthz`, `GET /sessions`, `GET /sessions/:hostname/:id/events`, `GET /sessions/:hostname/:id/stats`, `DELETE /sessions/:hostname/:id`, `WS /ws/ingest` (multi-writer, bidirectional — accepts envelopes and dispatches `delete` commands), `WS /ws/clients` (fan-out for session updates, poller liveness, and removal events). Pure state derivation lives in `internal/state/`. Persistence via SQLite (`modernc.org/sqlite`, no CGO) with WAL + `busy_timeout` to tolerate concurrent writers. Sessions are keyed by composite `(hostname, session_id)`.
 - **`frontend/`** — React 19 + Vite + TypeScript + Tailwind. Cyberpunk 2077 palette (cyan `#00f0ff`, yellow `#fcee0a`, red `#ff003c` on black). Mobile-first; cards ≥160 px; touch targets ≥44 px. Cards render `name@hostname` with the `@` and hostname color-separated for legibility. The conversation modal live-refreshes whenever the underlying session ticks forward (via the WS-driven `last_event_at` prop).
 
 Session status values (derived in `internal/state/derive.go`):
