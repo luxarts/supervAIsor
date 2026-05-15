@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -139,16 +140,21 @@ func (h *Handler) deleteSession(c *gin.Context) {
 	id := c.Param("id")
 	ctx := c.Request.Context()
 
+	log.Printf("api.delete: hostname=%s id=%s", hostname, id)
+
 	sess, err := h.Store.GetSession(ctx, hostname, id)
 	if err != nil {
+		log.Printf("api.delete: GetSession failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if sess == nil {
+		log.Printf("api.delete: session not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 		return
 	}
 	if h.Sender == nil || !h.Sender.IsOnline(hostname) {
+		log.Printf("api.delete: poller offline for hostname=%s", hostname)
 		c.JSON(http.StatusConflict, gin.H{"error": "poller offline"})
 		return
 	}
@@ -156,6 +162,7 @@ func (h *Handler) deleteSession(c *gin.Context) {
 	reqID := newRequestID()
 	respCh, err := h.Coordinator.Begin(reqID)
 	if err != nil {
+		log.Printf("api.delete: coordinator.Begin failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -166,18 +173,20 @@ func (h *Handler) deleteSession(c *gin.Context) {
 		ProjectDir: sess.ProjectDirEncoded,
 	}
 	body, _ := json.Marshal(cmd)
+	log.Printf("api.delete: dispatching to poller hostname=%s req=%s project_dir=%q", hostname, reqID, sess.ProjectDirEncoded)
 	if err := h.Sender.Send(hostname, body); err != nil {
-		// Clean up the pending coordinator entry so the timer doesn't
-		// hang on for 10s after we've already given up.
+		log.Printf("api.delete: sender.Send failed: %v", err)
 		h.Coordinator.Resolve(reqID, false, err.Error())
 		<-respCh
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("api.delete: awaiting ack req=%s", reqID)
 
 	select {
 	case r := <-respCh:
 		if r.Err != nil {
+			log.Printf("api.delete: ack with error req=%s err=%v", reqID, r.Err)
 			if errors.Is(r.Err, ingest.ErrTimeout) {
 				c.JSON(http.StatusGatewayTimeout, gin.H{"error": r.Err.Error()})
 				return
@@ -185,7 +194,9 @@ func (h *Handler) deleteSession(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": r.Err.Error()})
 			return
 		}
+		log.Printf("api.delete: ack ok req=%s", reqID)
 	case <-ctx.Done():
+		log.Printf("api.delete: client cancelled req=%s", reqID)
 		c.JSON(http.StatusGatewayTimeout, gin.H{"error": "client cancelled"})
 		return
 	}

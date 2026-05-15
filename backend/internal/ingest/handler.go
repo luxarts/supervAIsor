@@ -80,6 +80,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if registeredHost != "" && h.Registry != nil {
 			h.Registry.Remove(registeredHost, writeCh)
+			log.Printf("ingest: unregistered poller hostname=%q", registeredHost)
 		}
 	}()
 
@@ -95,6 +96,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(data, &head)
 
 		if head.Type == "delete_ack" {
+			log.Printf("ingest: delete_ack req=%s ok=%v err=%q", head.RequestID, head.OK, head.Error)
 			if h.Coordinator != nil {
 				h.Coordinator.Resolve(head.RequestID, head.OK, head.Error)
 			}
@@ -116,6 +118,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		if registeredHost == "" && h.Registry != nil {
 			h.Registry.Add(env.Hostname, writeCh)
 			registeredHost = env.Hostname
+			log.Printf("ingest: registered poller hostname=%q", env.Hostname)
 		}
 
 		prev, _ := h.Store.GetSession(ctx, env.Hostname, env.SessionID)

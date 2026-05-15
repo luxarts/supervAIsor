@@ -50,6 +50,7 @@ func (c *Client) Connect() error {
 		return err
 	}
 	c.conn = conn
+	log.Printf("wsclient: connected to %s", c.url)
 	return nil
 }
 
@@ -114,24 +115,37 @@ func (c *Client) Run(stop <-chan struct{}) {
 		}
 		_, data, err := conn.ReadMessage()
 		if err != nil {
+			log.Printf("wsclient: read loop exiting: %v", err)
+			// Make sure the broken conn doesn't get reused by the next
+			// iteration of the relaunch loop — Close clears c.conn so
+			// EnsureConnected reconnects on the scanner's next pass.
+			c.Close()
 			return
 		}
+		log.Printf("wsclient: received frame (%d bytes)", len(data))
 		var cmd Command
 		if err := json.Unmarshal(data, &cmd); err != nil {
+			log.Printf("wsclient: malformed frame, ignoring: %v", err)
 			continue
 		}
 		if cmd.Type == "" {
+			log.Printf("wsclient: frame missing 'type', ignoring (preview=%.120s)", string(data))
 			continue
 		}
+		log.Printf("wsclient: dispatch %s req=%s session=%s project_dir=%s", cmd.Type, cmd.RequestID, cmd.SessionID, cmd.ProjectDir)
 		ackErr := ""
 		ok := true
 		if c.OnCommand != nil {
 			if e := c.OnCommand(cmd); e != nil {
 				ok = false
 				ackErr = e.Error()
+				log.Printf("wsclient: OnCommand error: %v", e)
 			}
+		} else {
+			log.Printf("wsclient: WARNING no OnCommand handler set; acking ok with no action")
 		}
 		ackType := cmd.Type + "_ack"
+		log.Printf("wsclient: send %s req=%s ok=%v err=%q", ackType, cmd.RequestID, ok, ackErr)
 		if err := c.Send(Ack{Type: ackType, RequestID: cmd.RequestID, SessionID: cmd.SessionID, OK: ok, Error: ackErr}); err != nil {
 			log.Printf("wsclient: ack send: %v", err)
 			return
