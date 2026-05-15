@@ -23,6 +23,7 @@ func (h *Handler) Register(r *gin.Engine) {
 	})
 	r.GET("/sessions", h.listSessions)
 	r.GET("/sessions/:hostname/:id/events", h.getSessionEvents)
+	r.GET("/sessions/:hostname/:id/stats", h.getSessionStats)
 }
 
 func (h *Handler) listSessions(c *gin.Context) {
@@ -69,4 +70,30 @@ func (h *Handler) getSessionEvents(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, evs)
+}
+
+func (h *Handler) getSessionStats(c *gin.Context) {
+	hostname := c.Param("hostname")
+	id := c.Param("id")
+	ctx := c.Request.Context()
+
+	sess, err := h.Store.GetSession(ctx, hostname, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if sess == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+		return
+	}
+
+	// 100000 acts as "no limit" — full event log for accurate aggregates.
+	evs, err := h.Store.ListEvents(ctx, hostname, id, 100000)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	stats := state.ComputeStats(evs, sess)
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, stats)
 }
