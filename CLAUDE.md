@@ -26,10 +26,9 @@ Session status values (derived in `internal/state/derive.go`):
 
 | Status | Trigger |
 |---|---|
-| `working` | unmatched `tool_use` is pending |
-| `waiting_input` | last event < 30 s ago, no pending tool |
-| `idle` | last event between 30 s and 1 h ago |
-| `stale` | last event > 1 h ago |
+| `working` | pending tool_use OR last event < 2s ago (debounce) |
+| `done` | turn finished, last event ≤ 1h ago |
+| `stale` | last event > 1h ago |
 
 ## Development Commands
 

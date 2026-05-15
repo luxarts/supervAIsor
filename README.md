@@ -7,7 +7,7 @@ Mobile-first Cyberpunk 2077-themed dashboard for monitoring local Claude Code se
 Watches every Claude Code session running on your machine and shows them as live cards on a phone-friendly web UI. For each session you see:
 
 - name + project
-- status: `working` / `waiting_input` / `idle` / `stale`
+- status: `working` / `done` / `stale`
 - current action (e.g., `Write: src/foo.go`)
 - total elapsed time and current-prompt elapsed time
 
@@ -52,9 +52,8 @@ To use it from your phone, point your browser at `http://<your-mac-lan-ip>:5173`
 
 | Status | Meaning |
 |---|---|
-| `working` | Claude is currently running a tool (unmatched `tool_use`) |
-| `waiting_input` | Claude finished a turn within the last 30 s, waiting on you |
-| `idle` | No activity for 30 s – 1 h |
+| `working` | Claude is actively running a tool, or a new event arrived in the last 2 s (debounce) |
+| `done` | Turn finished, no activity for up to 1 h |
 | `stale` | No activity for over 1 h |
 
 ## Configuration
