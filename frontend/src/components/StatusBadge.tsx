@@ -1,10 +1,9 @@
 import type { Status } from "../types";
 
 const STYLES: Record<Status, { label: string; color: string; bg: string }> = {
-  working:       { label: "WORKING", color: "text-cy", bg: "border-cy/60" },
-  waiting_input: { label: "WAIT",    color: "text-yl", bg: "border-yl/60" },
-  idle:          { label: "IDLE",    color: "text-dim", bg: "border-dim/60" },
-  stale:         { label: "STALE",   color: "text-rd", bg: "border-rd/60" },
+  working: { label: "WORKING", color: "text-cy",  bg: "border-cy/60" },
+  done:    { label: "DONE",    color: "text-yl",  bg: "border-yl/60" },
+  stale:   { label: "STALE",   color: "text-rd",  bg: "border-rd/60" },
 };
 
 export function StatusBadge({ status }: { status: Status }) {

@@ -1,4 +1,4 @@
-export type Status = "working" | "waiting_input" | "idle" | "stale";
+export type Status = "working" | "done" | "stale";
 
 export interface Session {
   id: string;
