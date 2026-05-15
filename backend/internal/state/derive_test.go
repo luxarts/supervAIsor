@@ -125,9 +125,10 @@ func TestApply_ToolResult_ClearsPending(t *testing.T) {
 	if _, ok := got.PendingToolUseIDs["tool_1"]; ok {
 		t.Errorf("tool_1 should have been cleared")
 	}
-	// After clearing the last pending tool_use, Apply re-derives via
-	// RecomputeStatus with age=0, which falls inside the 2-s WORKING
-	// debounce. The runStatusTicker will flip it to DONE later.
+	// Apply calls RecomputeStatus(&next, ts) where ts is the event timestamp,
+	// and LastEventAt was just set to that same ts — so age=0 falls inside the
+	// 2-s WORKING debounce. The runStatusTicker (wall-clock-driven) is what
+	// later flips the session to DONE once 2s have elapsed.
 	if got.Status != StatusWorking {
 		t.Errorf("Status = %q, want working (debounce window)", got.Status)
 	}

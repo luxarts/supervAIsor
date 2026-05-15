@@ -46,7 +46,7 @@ func main() {
 	r.GET("/ws/ingest", gin.WrapF(ingestH.Serve))
 	r.GET("/ws/clients", gin.WrapF(clientsH.Serve))
 
-	// Periodic status recompute (idle/stale transitions).
+	// Periodic status recompute (DONE/STALE transitions).
 	go runStatusTicker(db, hub)
 
 	log.Printf("supervAIsor backend on :%s, db=%s", port, dbPath)
