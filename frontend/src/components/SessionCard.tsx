@@ -53,21 +53,32 @@ export function SessionCard({
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cy
                   ${borderColor} ${workingGlow} ${flashClass}`}
     >
-      {(pinned || notify) && (
-        <div className="absolute right-2 top-2 flex items-center gap-1 text-xs">
-          {pinned && <span aria-label="Pinned" title="Pinned">📌</span>}
-          {notify && <span aria-label="Notify enabled" title="Notify enabled">🔔</span>}
-        </div>
-      )}
-
       <header className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <StatusBadge status={session.status} />
           <span className="font-hud text-[10px] text-dim">
             · {formatRelative(age)}
           </span>
+          {pinned && (
+            <span
+              aria-label="Pinned"
+              title="Pinned"
+              className="font-hud text-sm leading-none text-cy"
+            >
+              ▣
+            </span>
+          )}
+          {notify && (
+            <span
+              aria-label="Notify enabled"
+              title="Notify enabled"
+              className="font-hud text-sm leading-none text-yl"
+            >
+              ◉
+            </span>
+          )}
         </div>
-        <div className="font-hud text-[10px] text-dim truncate max-w-[55%]">
+        <div className="font-hud text-[10px] text-dim truncate max-w-[40%]">
           {shortProject(session.project)}
         </div>
       </header>

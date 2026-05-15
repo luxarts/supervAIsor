@@ -36,16 +36,16 @@ describe("SessionCard", () => {
 
   it("shows the pin icon when pinned prop is true", () => {
     const { container, rerender } = render(<SessionCard session={sess} onOpen={() => {}} />);
-    expect(container.textContent).not.toContain("📌");
+    expect(container.querySelector('[aria-label="Pinned"]')).toBeNull();
     rerender(<SessionCard session={sess} onOpen={() => {}} pinned />);
-    expect(container.textContent).toContain("📌");
+    expect(container.querySelector('[aria-label="Pinned"]')).toBeTruthy();
   });
 
   it("shows the notify icon when notify prop is true", () => {
     const { container, rerender } = render(<SessionCard session={sess} onOpen={() => {}} />);
-    expect(container.textContent).not.toContain("🔔");
+    expect(container.querySelector('[aria-label="Notify enabled"]')).toBeNull();
     rerender(<SessionCard session={sess} onOpen={() => {}} notify />);
-    expect(container.textContent).toContain("🔔");
+    expect(container.querySelector('[aria-label="Notify enabled"]')).toBeTruthy();
   });
 
   it("applies the flash-complete class when flash='complete'", () => {
