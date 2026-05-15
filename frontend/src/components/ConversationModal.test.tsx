@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { ConversationModal } from "./ConversationModal";
 
 const sample = [
@@ -80,5 +80,55 @@ describe("ConversationModal", () => {
       expect.stringContaining("/sessions/mac-A/abc/events"),
       expect.anything(),
     );
+  });
+
+  it("switches to DETAILS tab and fetches /stats", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/stats")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            hostname: "mac-A",
+            id: "abc",
+            name: "my-sess",
+            project: "/Users/u/Projects/foo",
+            model: "claude-opus-4-7",
+            started_at: "2026-05-14T11:00:00Z",
+            last_event_at: "2026-05-14T12:00:02Z",
+            wall_clock_seconds: 3722,
+            tokens: { input: 0, output: 0, cache_creation: 0, cache_read: 0 },
+            counts: { user_prompts: 0, assistant_turns: 0, tool_calls: 0, errors: 0 },
+            tool_breakdown: {},
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => sample };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ConversationModal
+        sessionId="abc"
+        hostname="mac-A"
+        sessionName="my-sess"
+        project="/Users/u/Projects/foo"
+        lastEventAt="2026-05-14T12:00:02Z"
+        backendHttpBase="http://localhost:8080"
+        onClose={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("hello")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("tab", { name: /details/i }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/sessions/mac-A/abc/stats"),
+        expect.anything(),
+      ),
+    );
+    await waitFor(() => expect(screen.getByText("claude-opus-4-7")).toBeTruthy());
   });
 });
