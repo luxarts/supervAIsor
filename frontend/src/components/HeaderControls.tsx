@@ -1,15 +1,30 @@
+import type { SortKey } from "../lib/sort";
+
 interface Props {
   hideStale: boolean;
   onToggleHideStale: () => void;
   query: string;
   onQueryChange: (q: string) => void;
+  sort: SortKey;
+  onSortChange: (key: SortKey) => void;
 }
+
+const SORT_LABEL: Record<SortKey, string> = {
+  last_update: "LAST UPDATE",
+  name: "NAME",
+  host: "HOST",
+  status: "STATUS",
+};
+
+const SORT_OPTIONS: SortKey[] = ["last_update", "name", "host", "status"];
 
 export function HeaderControls({
   hideStale,
   onToggleHideStale,
   query,
   onQueryChange,
+  sort,
+  onSortChange,
 }: Props) {
   return (
     <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -36,6 +51,23 @@ export function HeaderControls({
           </button>
         )}
       </div>
+
+      <label className="flex items-center gap-2 font-hud text-xs uppercase tracking-widest text-dim">
+        <span className="hidden sm:inline">SORT</span>
+        <select
+          aria-label="Sort sessions"
+          value={sort}
+          onChange={(e) => onSortChange(e.target.value as SortKey)}
+          className="h-11 bg-bg-panel border border-cy/30 px-2 font-hud text-xs uppercase
+                     tracking-widest text-cy focus:border-cy focus:outline-none touch-manipulation"
+        >
+          {SORT_OPTIONS.map((k) => (
+            <option key={k} value={k}>
+              {SORT_LABEL[k]}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <button
         type="button"
